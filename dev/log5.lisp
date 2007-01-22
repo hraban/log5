@@ -2,20 +2,44 @@
 
 (defpackage #:log5
   (:use #:common-lisp)
-  (:export #:defcategory
+  (:documentation "A Common Lisp logging librart; CLLL? No, it's log5. Log5 is organized around 5 things:
+
+* Categories, 
+* Senders,
+* Outputs,
+* Messages, and
+* the Context
+
+")
+  (:export #:defcategory		;
 	   #:log-message
 	   #:log-if
 	   #:log-for
-	   #:senders
-	   #:start-sender
-	   #:stop-sender
-	   #:stop-all-senders
+	   #:senders			;
+	   #:start-sender		;
+	   #:stop-sender		;
+	   #:stop-all-senders		;
 	   #:context
 	   #:pop-context
 	   #:push-context
 	   #:with-context
-	   #:defoutput
-	   #:log-manager))
+	   #:defoutput			;
+	   ;; manager
+	   #:ignore-errors-p		;
+	   #:log-manager		;
+	   #:output-specs		;
+	   #:category-specs		;
+	   #:id->category		;
+	   ;; senders
+	   #:basic-sender		;
+	   #:stream-sender
+	   #:location
+	   #:output-spec
+	   #:category-spec
+	   ;; standard 'levels'
+	   #:fatal #:error #:warn #:info #:trace #:dribble
+	   ;; output
+	   #:time #:category #:message))
 
 (in-package #:log5)
 
@@ -24,16 +48,45 @@
 (defvar *log-manager* nil)
 
 (defun log-manager ()
+  "Returns the component that handles all of log5's bookkeeping."
   (or *log-manager* (setf *log-manager* (make-log-manager))))
 
-(defstruct (log-manager (:conc-name manager-))
+(defstruct (log-manager (:conc-name log5-))
   senders
-  context)
+  context
+  ignore-errors?)
 
-(defun handle-message (id message)
-  (dolist (sender (manager-senders (log-manager)))
+(defun ignore-errors-p ()
+  "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugging. This is setfable."
+  (log5-ignore-errors? (log-manager)))
+
+(defun (setf ignore-errors-p) (value)
+  "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugging. This is setfable."
+  (setf (log5-ignore-errors? (log-manager)) (not (null value))))
+
+(defun handle-message (id message &rest args)
+  (declare (dynamic-extent args))
+  (dolist (sender (log5-senders (log-manager)))
+    ;; check for new category and fix things up
+    (when (>= id (length (active-categories sender)))
+      ;;?? how pricy is this?
+      (update-active-categories sender id))
     (when (= (aref (active-categories sender) id) 1)
-      (funcall (handle-message-fn sender) sender message))))
+      (funcall (handle-message-fn sender) id sender
+	       (if args (apply #'format nil message args) message)))))
+
+(defun update-active-categories (sender max-id)
+  (let ((current-max-id (length (active-categories sender)))
+	(new-array (adjust-array (active-categories sender) (1+ max-id))))
+    (loop for index from current-max-id to max-id do
+	 (setf (aref new-array index)
+	       (if (sender-responds-to-category-p
+		    (category-spec sender) 
+		    (id->category index)) 1 0)))
+    (setf (slot-value (first (log5:senders)) 'active-categories)
+	  new-array)
+    sender))
+
 
 #|
 (defcategory :error)
@@ -53,11 +106,26 @@
 
 (defvar *name->category* (make-hash-table :test #'equal))
 
+(defvar *id->category* (make-hash-table :test #'eql))
+
 (defun reset-categories! ()
+  "Remove all category definitions; In general, it's not a good idea to use this but it can be handy if you need a clean slate."
   (setf *category-specs* (make-hash-table :test #'equal)
-	*name->category* (make-hash-table :test #'equal)))
+	*name->category* (make-hash-table :test #'equal)
+	*id->category* (make-hash-table :test #'eql)))
   
 (defmacro defcategory (name &optional category-spec documentation)
+  "Define a category named `name`. This can be a simple category like
+
+    (defcategory :error)
+    (defcategory prize-allocation)
+
+of a complex category like
+
+    (defcategory :bad-thing (or :error :warning :fatal))
+    (defcategory non-file-foo (and (or foo bar biz) (not file-access)))
+
+Specifically, a simple category is just a name whereas a complex category is a boolean combination of other categories (either simple or complex). See `category-specs` if you want a list of defined categories." 
   `(update-category-spec 
     ',name ',category-spec
     ,@(when documentation `(:documentation ,documentation))))
@@ -99,9 +167,10 @@
 	    (category-expanded-specification value) use-spec
 	    (values (category-variables value)
 		    (category-negated-variables value))
-	    (determine-category-variables use-spec))
+	    (determine-category-variables (or use-spec (list use-name))))
       (when name
-	(setf (gethash name *name->category*) value)) 
+	(setf (gethash name *name->category*) value))
+      (setf (gethash (category-id value) *id->category*) value)
       value)))
 
 (defun determine-category-variables (spec)
@@ -116,16 +185,17 @@
     (doit spec)
     (values (nreverse positive) (nreverse negative)))))
 
-(defun categories ()
-  (let ((result nil))
-    (maphash (lambda (name spec)
-	       (declare (ignore name))
-	       (push spec result))
-	     *category-specs*)
-    result))
+(defun id->category (id)
+  "Returns the category whose id is id (a number)."
+  (gethash id *id->category*))
 
 (defun canonize-category-name (name)
-  (intern (symbol-name name) (find-package :log5)))
+  (typecase name
+    (string (intern name *package*))
+    (symbol (if (eq (symbol-package name) (find-package :keyword))
+		(intern (symbol-name name) *package*)
+		name))
+    (t (error 'bad-category-type-error :name name))))
 
 (defun canonize-category-specification (specification)
   (labels ((doit (x)
@@ -148,6 +218,13 @@
 	(or (category-expanded-specification spec) name)
 	name)))
 
+(defcategory :fatal)
+(defcategory :error)
+(defcategory :warn)
+(defcategory :info)
+(defcategory :trace)
+(defcategory :dribble)
+
 #|
 (defoutput message ...)
 (defoutput human-time ...)
@@ -161,6 +238,11 @@
   name form (format "~s") static?)
 
 (defmacro defoutput (name form &key format static?)
+  "Define an output specification: a link between a `name` and a `form` that will be called during logging to put something in the log file. 
+You can specify a `format` string (as in a call to `format`) with the 
+:format keyword argument. You can use the keyword :static? to indicate
+that the form's value will not change (e.g., the time of day is _not_
+static but the process id of the current Lisp is)."
   `(update-output-spec ',name ',form 
 			 ,@(when format `(:format ,format))
 			 ,@(when static? `(:static? t))))
@@ -175,11 +257,50 @@
     (setf (output-static? value) static?)
     name))
 
+(defun output-specs ()
+  "Returns a list of the current output specs in alphatetical order."
+  (sort
+   (collect-key-value 
+    *output-specs*
+    :transform (lambda (k v) (declare (ignore v)) k))
+   #'string-lessp))
+
+(defun category-specs ()
+  "Returns a list of the defined category specs in alphatetical order."
+  (sort
+   (collect-key-value
+    *category-specs*
+    :transform (lambda (k v) (declare (ignore k)) v))
+   #'< :key #'category-id))
+
+(defun collect-key-value (ht &key (transform 'cons))
+  (let ((result nil))
+    (maphash (lambda (k v) 
+	       (push (funcall transform k v) result))
+	     ht)
+    result))
+
 (defoutput time (get-universal-time))
 
 ;;?? find duplicates
 (defmacro start-sender (name (sender-type &rest args) &key 
-			 category-spec output-spec)
+			category-spec output-spec)
+  "Create a log-message sender and add it to the list of active
+senders. Each sender  has a `name`, a category-spec, an output-spec and
+a class (with optional initialization arguments). The `name` should be 
+symbol and only one sender of any particular name can exist at a time.
+
+The category-spec is a boolean combination of categories (see `defcategory`).
+A sender will send any message whose message-category satisfies the sender's
+category-spec.
+
+The output-spec is a list of outputs defined with `defoutput`. You can also
+include strings and the special, predefined, outputs:
+
+* message - the text of the current log message
+* context - the contents of the current context (as a list)
+* category - the value of the category of the current message
+"
   `(push
     (make-instance 
      ',sender-type 
@@ -187,26 +308,29 @@
      :category-spec ',(canonize-category-specification category-spec)
      :output-spec ',output-spec
      ,@args)
-    (manager-senders (log-manager))))
+    (log5-senders (log-manager))))
 
 (defmacro stop-sender (name)
+  "Find the sender named `name` and stop it."
   `(stop-sending ',name))
 
 (defun stop-sending (name)
-  (let ((sender (find name (manager-senders (log-manager)) 
+  (let ((sender (find name (log5-senders (log-manager)) 
 		      :key #'name))) 	
     (cond (sender
 	   (close-sender sender)
-	   (setf (manager-senders (log-manager)) 
-		 (remove name (manager-senders (log-manager)) 
+	   (setf (log5-senders (log-manager)) 
+		 (remove name (log5-senders (log-manager)) 
 			 :key #'name))))))
 
 (defun stop-all-senders ()
-  (loop for sender in (manager-senders (log-manager)) do
+  "Stops all logging."
+  (loop for sender in (log5-senders (log-manager)) do
        (stop-sending (name sender))))
 
 (defun senders ()
-  (copy-list (manager-senders (log-manager))))
+  "Returns a list of the current senders."
+  (copy-list (log5-senders (log-manager))))
 
 (defclass basic-sender ()
   ((lock :reader lock)
@@ -214,7 +338,8 @@
    (category-spec :initarg :category-spec :reader category-spec)
    (output-spec :initarg :output-spec :reader output-spec)
    (handle-message-fn :reader handle-message-fn)
-   (active-categories :reader active-categories)))
+   (active-categories :reader active-categories))
+  (:documentation "The root sender class from which all senders should descend."))
 
 (defmethod initialize-instance :after ((object basic-sender) &key 
 				       )
@@ -262,18 +387,15 @@
 				     :initial-element nil)
 	(progv sender-free (make-list (length sender-free)
 				      :initial-element nil)
-	  ;(print sender-spec)
-	  ;(print cat-positive)
-	  ;(print cat-negative)
-	  ;(print sender-free)
+;	  (print sender-spec)
+;	  (print cat-positive)
+;	  (print cat-negative)
+;	  (print sender-free)
 	  (eval sender-spec))))))
 
-#+(or)
-(foo '(a b) '(a c d e) '(and (or a c) (or b d) e))
-
 (defun build-handle-message-fn (sender)
-  `(lambda (sender message)
-     (let (,@(create-context sender))
+  `(lambda (category-id sender message)
+     (let (,@(create-handle-message-context sender))
        (unwind-protect
 	    (progn
 	      ,@(start-handling sender) 
@@ -288,7 +410,7 @@
 		   (handle-output sender output)))
 	 ,@(finish-handling sender)))))
 
-(defmethod create-context ((sender basic-sender)) nil)
+(defmethod create-handle-message-context ((sender basic-sender)) nil)
 
 (defmethod start-handling ((sender basic-sender)) nil)
 
@@ -297,17 +419,17 @@
 (defmethod separate-properties ((sender basic-sender)) nil)
 
 (defun predefined-output-p (name)
-  (find name '(message context first-context stack)))
+  (find name '(message context first-context stack category)))
 
 (defmethod close-sender (sender)
-  (delcare (ignore sender)))
+  (declare (ignore sender)))
 
 (defclass stream-sender (basic-sender)
   ((output-stream :reader output-stream)
    (close-stream? :reader close-stream?)
    (location :initarg :location :reader location)))
 
-(defmethod create-context ((sender stream-sender))
+(defmethod create-handle-message-context ((sender stream-sender))
   `((stream (output-stream sender))))
 
 (defmethod start-handling ((sender stream-sender)) 
@@ -322,10 +444,16 @@
 (defmethod handle-output ((sender stream-sender) output)
   (cond ((eq output 'message)
 	 `(progn (princ #\" stream) (princ message stream) (princ #\" stream)))
+	((eq output 'category)
+	 `(progn 
+	    (princ #\" stream) 
+	    (princ (category-specification (id->category category-id))
+		   stream)
+	    (princ #\" stream)))
 	((eq output 'context)
-	 `(princ (manager-context (log-manager)) stream))
+	 `(princ (log5-context (log-manager)) stream))
 	((eq output 'first-context)
-	 `(princ (first (manager-context (log-manager))) stream))
+	 `(princ (first (log5-context (log-manager))) stream))
 	((stringp output)
 	 `(progn (princ #\" stream) (princ ,output) (princ #\" stream)))
 	#+(or)
@@ -356,27 +484,23 @@
       `(values)
       (let ((category (update-category-spec nil category-spec)))
 	`(handle-message
-	  ,(category-id category)
-	  ,(if args `(format nil ,message ,@args) message)))))
-
-#+(or)
-(defmacro log-for (category-spec message &rest args)
-  (update-category-spec nil category-spec)
-  (if (member :no-logging *features*)
-      `(values)
-      `(handle-message
-	(load-time-value
-	 ,(category-id (update-category-spec nil category-spec))
-	 :read-only-p t)
-	,(if args `(format nil ,message ,@args) message))))
+	    ,(category-id category)
+	    ,message
+	    ,@args)
+	#+(or)
+	`(ignore-errors
+	   (handle-message
+	    ,(category-id category)
+	    ,message
+	    ,@args)))))
 
 ;;;;; context
 
 (defun pop-context ()
-  (pop (manager-context (log-manager))))
+  (pop (log5-context (log-manager))))
 
 (defun push-context (context)
-  (push context (manager-context (log-manager))))
+  (push context (log5-context (log-manager))))
 
 (defmacro with-context (context &body body)
   `(unwind-protect
@@ -384,6 +508,37 @@
 	       ,@body)
      (pop-context)))
 
+#|
+;;;;; with-logging
+
+(defmacro with-logging ((&key name (period 10) reset-log? path)
+			       &body body)
+  (assert (and (numberp period) (plusp period)))
+  (assert (not (null path)))
+  (with-gensyms (process)
+    `(let ((,process (mp:process-run-function 
+	`	     "memory-logger" #'memory-logger
+		     ,name ,period ,path ,reset-log?)))
+      (unwind-protect
+	   (progn ,@body)
+	(mp:process-kill ,process)))))
+
+(defun memory-logger (name period path reset-log?)
+  (with-logging (path :reset-log? reset-log?)
+    (loop do
+	 (log-message (memory-log-message name))
+	 (sleep period))))
+
+(defun memory-log-message (name)
+  (with-output-to-string (out)
+    (format out "~%~a " name)
+    (format out " ~{~{~s ~} ~}" 
+	    (delete-if 
+	     (lambda (pair) 
+	       (not (member (first pair) 
+			    '(:%CPU :%MEM :VSZ :RSS)))) 
+	     (os-process-info)))))
+|#
 ;;;;; utilities
 
 (defun flatten (list)
