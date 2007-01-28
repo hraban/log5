@@ -1,0 +1,68 @@
+sender name should be canonized
+
+print methods for senders
+
+;;?? suppose we have a computation that outputs 
+;; multiple bits of information that we'd like to
+;; offer separately. How can we do the computation
+;; just once
+
+for configuration
+  need to massage to handle well know locations 
+  which are??
+
+(log5:start-sender (log5:stream-sender :location *standard-output*)
+  :output-spec (time log5:message)
+  :category-spec (or info maintenance))
+
+log rotation
+
+stuff with active-categories initialization is very hacky
+
+with-sender ... ?
+
+May need to split senders into an accepter and an outputer
+
+reset-categories! should stop-all-senders too (warn first?)
+
+what should start-sender `name` do when there is already a sender named `name`?
+  stop the existing (maybe a parameter)
+
+benchmark using restarts versus not using them
+
+log-for has an ignore-errors wrapped around it...
+  could be a dev/deploy distinction
+
+
+;;?? suppose we have a computation that outputs 
+;; multiple bits of information that we'd like to
+;; offer separately. How can we do the computation
+;; just once
+
+periodic logger (I made one in agraph)
+
+log-if
+
+tests
+
+? stop-logs
+
+~ contexts
+
+context in property-spec
+
+stack-trace
+  port 
+
+ok - Are categories in their own package? (in log5?) in the package in which 
+  they are defined? 
+  Currently, we put 'em in log5; but we should leave 'em where they are
+ok - Define and export the various 'levels'
+ok - seems we need lazy array resizing... 
+  why doesn't log-for update the environment
+ok - strings in property-spec
+ok - boolean category combinations
+ok - need to be able to startup logs from an initialization file 
+no - How about a default category that log-message uses (or log-for nil means
+    use the default). I think that this would make things too unclear
+ok - get unhelpful error if try to log for non-existent category
