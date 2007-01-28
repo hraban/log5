@@ -5,10 +5,16 @@
 (in-package #:log5-system)
 
 (defsystem log5
+  :version "0.1.0"
+  :author "Gary Warren King <gwking@metabang.com>"  
+  :maintainer "Gary Warren King <gwking@metabang.com>"
+  :licence "MIT License (see the fike COPYING for details)"
+  :description "Log5 is a Common Lisp logging library"
   :components
   ((:module "dev"
     :components ((:file "log5")
 		 (:file "port" :depends-on ("log5"))
+		 (:file "config" :depends-on ("log5"))
 		 ) 
   )))
 
