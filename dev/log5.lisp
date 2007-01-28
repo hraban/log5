@@ -32,14 +32,26 @@
 	   #:id->category		;
 	   ;; senders
 	   #:basic-sender		;
+	   #:sender-with-categories
+	   #:stream-sender-mixin
 	   #:stream-sender
 	   #:location
 	   #:output-spec
 	   #:category-spec
+	   #:close-sender
+	   #:create-handle-message-context
+	   #:start-handling
+	   #:finish-handling
+	   #:close-stream?
+	   #:output-stream
+	   #:name
 	   ;; standard 'levels'
 	   #:fatal #:error #:warn #:info #:trace #:dribble
+	    #:error+ #:warn+ #:info+ #:trace+ #:dribble+
 	   ;; output
-	   #:time #:category #:message))
+	   #:time #:category #:message
+	   ;; configuration
+	   #:configure-from-file))
 
 (in-package #:log5)
 
@@ -50,6 +62,30 @@
 (defun log-manager ()
   "Returns the component that handles all of log5's bookkeeping."
   (or *log-manager* (setf *log-manager* (make-log-manager))))
+
+(define-condition sender-not-found-warning (warning)
+  ((sender-name :initform nil :reader sender-name :initarg :sender-name))
+  (:report (lambda (c s)
+	     (format s "Sender ~a not found" (sender-name c)))))
+
+(define-condition bad-category-type-error (error)
+  ((name :initform nil :initarg :name :reader name))
+  (:report (lambda (c s)
+	     (format s "Category names must be strings or symbols and  ~a is neither." 
+		     (name c)))))
+
+(define-condition simple-category-not-found-error (error)
+  ((name :initform nil :initarg :name :reader name))
+  (:report (lambda (c s)
+	     (format s "There is no simple category named ~a. Use defcategory to define simple categories before using it."
+		     (name c)))))
+
+(define-condition output-not-found-error (error)
+  ((name :initform nil :initarg :name :reader name))
+  (:report (lambda (c s)
+	     (format s "There is no output-specification named ~a. Use defoutput to define output specifications before using them in a sender."
+		     (name c)))))
+
 
 (defstruct (log-manager (:conc-name log5-))
   senders
@@ -66,26 +102,22 @@
 
 (defun handle-message (id message &rest args)
   (declare (dynamic-extent args))
-  (dolist (sender (log5-senders (log-manager)))
-    ;; check for new category and fix things up
-    (when (>= id (length (active-categories sender)))
-      ;;?? how pricy is this?
-      (update-active-categories sender id))
-    (when (= (aref (active-categories sender) id) 1)
-      (funcall (handle-message-fn sender) id sender
-	       (if args (apply #'format nil message args) message)))))
-
-(defun update-active-categories (sender max-id)
-  (let ((current-max-id (length (active-categories sender)))
-	(new-array (adjust-array (active-categories sender) (1+ max-id))))
-    (loop for index from current-max-id to max-id do
-	 (setf (aref new-array index)
-	       (if (sender-responds-to-category-p
-		    (category-spec sender) 
-		    (id->category index)) 1 0)))
-    (setf (slot-value (first (log5:senders)) 'active-categories)
-	  new-array)
-    sender))
+  (let ((output nil))
+    (dolist (sender (log5-senders (log-manager)))
+      ;; check for new category and fix things up
+      (when (>= id (length (active-categories sender)))
+	;;?? how pricy is this?
+	(update-active-categories sender id))
+      #+(or)
+      (format t "~&~a ~d ~a" 
+	      sender id (aref (active-categories sender) id))
+      (when (= (aref (active-categories sender) id) 1)
+	(funcall (handle-message-fn sender) id sender
+		 (or output
+		     (setf output
+			   (if args 
+			       (apply #'format nil message args) message))))
+	(values t)))))
 
 
 #|
@@ -169,7 +201,7 @@ Specifically, a simple category is just a name whereas a complex category is a b
 		    (category-negated-variables value))
 	    (determine-category-variables (or use-spec (list use-name))))
       (when name
-	(setf (gethash name *name->category*) value))
+	(setf (gethash use-name *name->category*) value))
       (setf (gethash (category-id value) *id->category*) value)
       value)))
 
@@ -189,13 +221,22 @@ Specifically, a simple category is just a name whereas a complex category is a b
   "Returns the category whose id is id (a number)."
   (gethash id *id->category*))
 
+(defun name->category (name)
+  "Returns the category whose name (assumed to be properly **canonized**) is name."
+  (gethash name *name->category*))
+
 (defun canonize-category-name (name)
-  (typecase name
-    (string (intern name *package*))
-    (symbol (if (eq (symbol-package name) (find-package :keyword))
-		(intern (symbol-name name) *package*)
-		name))
-    (t (error 'bad-category-type-error :name name))))
+  (let ((use-name 
+	 (typecase name
+	   (string (intern name *package*))
+	   (symbol (if (eq (symbol-package name) (find-package :keyword))
+		       (intern (symbol-name name) *package*)
+		       name))
+	   (t (error 'bad-category-type-error :name name)))))
+    (when (not (or (name->category use-name)
+		   (logical-connective-p use-name)))
+      (error 'simple-category-not-found-error :name name))
+    use-name))
 
 (defun canonize-category-specification (specification)
   (labels ((doit (x)
@@ -220,10 +261,15 @@ Specifically, a simple category is just a name whereas a complex category is a b
 
 (defcategory :fatal)
 (defcategory :error)
+(defcategory :error+ (or :error :fatal))
 (defcategory :warn)
+(defcategory :warn+ (or :warn :error+))
 (defcategory :info)
+(defcategory :info+ (or :info :warn+))
 (defcategory :trace)
+(defcategory :trace+ (or :trace :info+))
 (defcategory :dribble)
+(defcategory :dribble+ (or :dribble :trace+))
 
 #|
 (defoutput message ...)
@@ -301,27 +347,45 @@ include strings and the special, predefined, outputs:
 * context - the contents of the current context (as a list)
 * category - the value of the category of the current message
 "
-  `(push
-    (make-instance 
-     ',sender-type 
-     :name ',name
-     :category-spec ',(canonize-category-specification category-spec)
-     :output-spec ',output-spec
-     ,@args)
-    (log5-senders (log-manager))))
+  `(start-sender-fn
+    ',name 
+    ',(canonize-category-specification category-spec)
+    ',output-spec
+    ',sender-type 
+    ,@args))
+    
+(defun start-sender-fn (name category-spec output-spec 
+			sender-type &rest args)
+  ;; stop any current one with the same name... warn?
+  (stop-sending name :warn-if-not-found-p nil)
+  (let ((sender (apply #'make-instance 
+		 sender-type 
+		 :name name
+		 :category-spec
+		 (canonize-category-specification category-spec)
+		 :output-spec 
+		 (if (consp output-spec) 
+		     output-spec (list output-spec))
+		 args)))
+    (push sender (log5-senders (log-manager)))
+    sender))
 
 (defmacro stop-sender (name)
   "Find the sender named `name` and stop it."
-  `(stop-sending ',name))
+  `(progn (stop-sending ',name) nil))
 
-(defun stop-sending (name)
+(defun stop-sending (name &key (warn-if-not-found-p t))
   (let ((sender (find name (log5-senders (log-manager)) 
 		      :key #'name))) 	
     (cond (sender
 	   (close-sender sender)
 	   (setf (log5-senders (log-manager)) 
 		 (remove name (log5-senders (log-manager)) 
-			 :key #'name))))))
+			 :key #'name))
+	   sender)
+	  (t
+	   (when warn-if-not-found-p
+	     (warn 'sender-not-found-warning :sender-name name))))))
 
 (defun stop-all-senders ()
   "Stops all logging."
@@ -335,16 +399,42 @@ include strings and the special, predefined, outputs:
 (defclass basic-sender ()
   ((lock :reader lock)
    (name :reader name :initarg :name)
-   (category-spec :initarg :category-spec :reader category-spec)
    (output-spec :initarg :output-spec :reader output-spec)
    (handle-message-fn :reader handle-message-fn)
-   (active-categories :reader active-categories))
+   (active-categories :reader active-categories
+		      :initform (make-array 0 :element-type 'bit)))
   (:documentation "The root sender class from which all senders should descend."))
+
+(defmethod print-object ((sender basic-sender) stream)
+  (print-unreadable-object (sender stream :type t :identity t)
+    (print-sender sender stream)))
+
+(defgeneric print-sender (sender stream)
+  (:documentation "Print information about sender to stream"))
+
+(defmethod print-sender ((sender basic-sender) stream)
+  (format stream "~a" (name sender)))
 
 (defmethod initialize-instance :after ((object basic-sender) &key 
 				       )
   (setf (slot-value object 'handle-message-fn)
-	(build-handle-message-fn object)
+	(build-handle-message-fn object)))
+
+(defmethod update-active-categories ((sender basic-sender) max-id)
+  (setf (slot-value sender 'active-categories)
+	(adjust-array (active-categories sender) (1+ max-id)
+		      :initial-element 0))
+  sender)
+
+(defclass sender-with-categories (basic-sender)
+  ((category-spec :initarg :category-spec :reader category-spec)
+   (expanded-specification :initform nil :reader expanded-specification))
+  (:documentation "A sender that responds only to certain log categories."))
+
+(defmethod initialize-instance :after ((object sender-with-categories) &key 
+				       )
+  (setf (slot-value object 'expanded-specification)
+	(canonize-category-specification (slot-value object 'category-spec))
 	(slot-value object 'active-categories)
 	(make-active-category-array object)))
 
@@ -361,17 +451,21 @@ include strings and the special, predefined, outputs:
        (declare (ignore name))
        (setf (aref array (category-id category))
 	     (if (sender-responds-to-category-p
-		  (category-spec sender) category) 1 0)))
+		  (expanded-specification sender) category) 1 0)))
      *category-specs*)
     array))
 
-#+(or)
-;;?? assume, for today, that sender's spec is AND and 
-;; message-spec is OR
-(defun sender-responds-to-category-p (sender category-spec)
-  (every (lambda (category)
-	   (member category category-spec))
-	 (category-spec sender)))
+(defmethod update-active-categories ((sender sender-with-categories) max-id)
+  (let ((current-max-id (length (active-categories sender)))
+	(new-array (adjust-array (active-categories sender) (1+ max-id))))
+    (loop for index from current-max-id to max-id do
+	 (setf (aref new-array index)
+	       (if (sender-responds-to-category-p
+		    (expanded-specification sender) 
+		    (id->category index)) 1 0)))
+    (setf (slot-value sender 'active-categories)
+	  new-array)
+    sender))
 
 (defun sender-responds-to-category-p (sender-spec category-spec)
   (let* ((cat-positive (category-variables category-spec))
@@ -400,15 +494,18 @@ include strings and the special, predefined, outputs:
 	    (progn
 	      ,@(start-handling sender) 
 	      ,@(loop for name in (output-spec sender) 
-		   for output = (or (predefined-output-p name)
-				      (and (stringp name) name)
-				      (gethash name *output-specs*)) 
+		   for output = (valid-output-p name) 
 		   for first? = t then nil
-		   unless output do (warn "No output named ~a" name)
+		   unless output do (error 'output-not-found-error :name name)
 		   unless first? collect (separate-properties sender)
 		   when output collect 
 		   (handle-output sender output)))
 	 ,@(finish-handling sender)))))
+
+(defun valid-output-p (name)
+  (or (predefined-output-p name)
+      (and (stringp name) name)
+      (gethash name *output-specs*)))
 
 (defmethod create-handle-message-context ((sender basic-sender)) nil)
 
@@ -424,75 +521,101 @@ include strings and the special, predefined, outputs:
 (defmethod close-sender (sender)
   (declare (ignore sender)))
 
-(defclass stream-sender (basic-sender)
+(defclass stream-sender-mixin (basic-sender)
   ((output-stream :reader output-stream)
    (close-stream? :reader close-stream?)
    (location :initarg :location :reader location)))
 
-(defmethod create-handle-message-context ((sender stream-sender))
+(defmethod create-handle-message-context ((sender stream-sender-mixin))
   `((stream (output-stream sender))))
 
-(defmethod start-handling ((sender stream-sender)) 
-  `((fresh-line stream)))
+(defmethod start-handling ((sender stream-sender-mixin)) 
+  `((file-position stream (file-length stream))
+    (fresh-line stream)))
 
-(defmethod finish-handling ((sender stream-sender))
+(defmethod finish-handling ((sender stream-sender-mixin))
   `((force-output stream)))
 
-(defmethod separate-properties ((sender stream-sender))
+(defmethod separate-properties ((sender stream-sender-mixin))
   `(princ #\Space stream))
 
-(defmethod handle-output ((sender stream-sender) output)
+(defmethod handle-output ((sender stream-sender-mixin) output)
   (cond ((eq output 'message)
 	 `(progn (princ #\" stream) (princ message stream) (princ #\" stream)))
 	((eq output 'category)
 	 `(progn 
 	    (princ #\" stream) 
-	    (princ (category-specification (id->category category-id))
-		   stream)
+	    (let ((category (id->category category-id)))
+	      (if category
+		  (princ (category-specification category) stream)
+		  (format stream "\"category ~d not found\"" category-id)))
 	    (princ #\" stream)))
 	((eq output 'context)
 	 `(princ (log5-context (log-manager)) stream))
 	((eq output 'first-context)
 	 `(princ (first (log5-context (log-manager))) stream))
 	((stringp output)
-	 `(progn (princ #\" stream) (princ ,output) (princ #\" stream)))
-	#+(or)
-	((eq output 'stack)
-	 `(princ message stream))
+	 `(progn (princ #\" stream) (princ ,output stream) (princ #\" stream)))
 	((typep output 'log-output)
-	 `(princ ,(output-form output) stream))
+	 (if (output-format output)
+	     `(format stream ,(output-format output) ,(output-form output))
+	     `(princ ,(output-form output) stream)))
 	(t
 	 (error "don't know how to handle ~a" output))))
 
-(defmethod initialize-instance :after ((object stream-sender) &key location)
+#+(or)
+;; trying to refactor
+(defun output->value-code (output)
+  (cond ((eq output 'message)
+	 `message)
+	((eq output 'category)
+	 `(category-specification (id->category category-id)))
+	((eq output 'context)
+	 `(log5-context (log-manager)))
+	((eq output 'first-context)
+	 `(first (log5-context (log-manager))))
+	((stringp output)
+	 output)
+	((typep output 'log-output)
+	 (if (output-format output)
+	     `(format stream ,(output-format output) ,(output-form output))
+	     `(princ ,(output-form output) stream)))
+	(t
+	 (error "don't know how to handle ~a" output))))
+
+(defmethod initialize-instance :after ((object stream-sender-mixin) 
+				       &key location)
   (setf (slot-value object 'close-stream?) (not (streamp location))
 	(slot-value object 'output-stream)
 	(cond ((streamp location) location)
 	      ((or (pathnamep location) (stringp location))
+	       (ensure-directories-exist location)
 	       (open location :direction :output
 		     :if-does-not-exist :create
 		     :if-exists :append 
 		     #+(or) (if reset-log? :supersede :append)))
 	      (t (error "don't know how to log to ~a" location)))))
 
-(defmethod close-sender ((sender stream-sender))
+(defmethod close-sender ((sender stream-sender-mixin))
   (when (close-stream? sender)
     (close (output-stream sender))))
- 
+
+(defclass stream-sender (stream-sender-mixin sender-with-categories)
+  ())
+
+;;;;; messages 
+
 (defmacro log-for (category-spec message &rest args)
   (if (member :no-logging *features*)
       `(values)
-      (let ((category (update-category-spec nil category-spec)))
-	`(handle-message
-	    ,(category-id category)
-	    ,message
-	    ,@args)
-	#+(or)
-	`(ignore-errors
-	   (handle-message
-	    ,(category-id category)
-	    ,message
-	    ,@args)))))
+      `(let ((category (load-time-value 
+			(update-category-spec nil ',category-spec)
+			:read-only-p t)))
+	 (handle-message
+	  (category-id category)
+	  ,message
+	  ,@args))))
+
 
 ;;;;; context
 
