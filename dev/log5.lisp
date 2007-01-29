@@ -185,7 +185,7 @@ Specifically, a simple category is just a name whereas a complex category is a b
 			     (documentation nil documentation-supplied?))
   (declare (ignore documentation documentation-supplied?))
   (let* ((use-spec (canonize-category-specification specification))
-	 (use-name (or (and name (canonize-category-name name))
+	 (use-name (or (and name (canonize-category-name name :simple? t))
 		       use-spec)))
     (multiple-value-bind (value found?) 
 	(gethash use-name *category-specs*)
@@ -225,7 +225,7 @@ Specifically, a simple category is just a name whereas a complex category is a b
   "Returns the category whose name (assumed to be properly **canonized**) is name."
   (gethash name *name->category*))
 
-(defun canonize-category-name (name)
+(defun canonize-category-name (name &key (simple? nil))
   (let ((use-name 
 	 (typecase name
 	   (string (intern name *package*))
@@ -233,7 +233,8 @@ Specifically, a simple category is just a name whereas a complex category is a b
 		       (intern (symbol-name name) *package*)
 		       name))
 	   (t (error 'bad-category-type-error :name name)))))
-    (when (not (or (name->category use-name)
+    (when (not (or simple? 
+		   (name->category use-name)
 		   (logical-connective-p use-name)))
       (error 'simple-category-not-found-error :name name))
     use-name))
@@ -259,17 +260,17 @@ Specifically, a simple category is just a name whereas a complex category is a b
 	(or (category-expanded-specification spec) name)
 	name)))
 
-(defcategory :fatal)
-(defcategory :error)
-(defcategory :error+ (or :error :fatal))
-(defcategory :warn)
-(defcategory :warn+ (or :warn :error+))
-(defcategory :info)
-(defcategory :info+ (or :info :warn+))
-(defcategory :trace)
-(defcategory :trace+ (or :trace :info+))
-(defcategory :dribble)
-(defcategory :dribble+ (or :dribble :trace+))
+(defcategory fatal)
+(defcategory error)
+(defcategory error+ (or error fatal))
+(defcategory warn)
+(defcategory warn+ (or warn error+))
+(defcategory info)
+(defcategory info+ (or info warn+))
+(defcategory trace)
+(defcategory trace+ (or trace info+))
+(defcategory dribble)
+(defcategory dribble+ (or dribble trace+))
 
 #|
 (defoutput message ...)
