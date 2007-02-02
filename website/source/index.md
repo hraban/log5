@@ -16,7 +16,7 @@ Log5 is a Common Lisp logging framework organized around five things: categories
 
 * and the *Context* provides a way to annotate log messages dynamically (useful, for example, if an application serves multiple clients). Log4j calls this a *[Nested Diagnostic Context][ndc]* but that's too high-faluting for me.
 
-
+For more details, you can keep reading or see the [user-guide][].
 
 ### Overview 
 

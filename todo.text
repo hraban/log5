@@ -1,6 +1,9 @@
-sender name should be canonized
+stream-sender: reset-log parameter, backup-log parameter
 
-print methods for senders
+being able to change category-spec of a sender in midstream?
+  should sender annotate the log information like this?
+
+sender name should be canonized
 
 ;;?? suppose we have a computation that outputs 
 ;; multiple bits of information that we'd like to
@@ -21,23 +24,18 @@ stuff with active-categories initialization is very hacky
 
 with-sender ... ?
 
-May need to split senders into an accepter and an outputer
+May need to split senders into an accepter and an outputers
+  or make a multi-sender that 
 
 reset-categories! should stop-all-senders too (warn first?)
 
 what should start-sender `name` do when there is already a sender named `name`?
-  stop the existing (maybe a parameter)
+  stop the existing (maybe a parameter, warn?)
 
 benchmark using restarts versus not using them
 
 log-for has an ignore-errors wrapped around it...
   could be a dev/deploy distinction
-
-
-;;?? suppose we have a computation that outputs 
-;; multiple bits of information that we'd like to
-;; offer separately. How can we do the computation
-;; just once
 
 periodic logger (I made one in agraph)
 
@@ -66,3 +64,4 @@ ok - need to be able to startup logs from an initialization file
 no - How about a default category that log-message uses (or log-for nil means
     use the default). I think that this would make things too unclear
 ok - get unhelpful error if try to log for non-existent category
+ok - print methods for senders
