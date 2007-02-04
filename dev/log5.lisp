@@ -55,6 +55,20 @@
 
 (in-package #:log5)
 
+(defgeneric update-active-categories (sender maximum-id))
+
+(defgeneric create-handle-message-context (sender))
+
+(defgeneric start-handling (sender))
+
+(defgeneric finish-handling (sender))
+
+(defgeneric separate-properties (sender))
+
+(defgeneric close-sender (sender))
+
+(defgeneric handle-output (sender output))
+
 (defparameter *default-logical-connective* 'or)
 
 (defvar *log-manager* nil)
@@ -71,19 +85,19 @@
 (define-condition bad-category-type-error (error)
   ((name :initform nil :initarg :name :reader name))
   (:report (lambda (c s)
-	     (format s "Category names must be strings or symbols and  ~a is neither." 
+	     (format s "Category names must be strings or symbols and ~s is neither." 
 		     (name c)))))
 
 (define-condition simple-category-not-found-error (error)
   ((name :initform nil :initarg :name :reader name))
   (:report (lambda (c s)
-	     (format s "There is no simple category named ~a. Use defcategory to define simple categories before using it."
+	     (format s "There is no simple category named ~s. Use defcategory to define simple categories before using it."
 		     (name c)))))
 
 (define-condition output-not-found-error (error)
   ((name :initform nil :initarg :name :reader name))
   (:report (lambda (c s)
-	     (format s "There is no output-specification named ~a. Use defoutput to define output specifications before using them in a sender."
+	     (format s "There is no output-specification named ~s. Use defoutput to define output specifications before using them in a sender."
 		     (name c)))))
 
 
@@ -350,7 +364,7 @@ include strings and the special, predefined, outputs:
 "
   `(start-sender-fn
     ',name 
-    ',(canonize-category-specification category-spec)
+    ',category-spec
     ',output-spec
     ',sender-type 
     ,@args))
@@ -358,7 +372,7 @@ include strings and the special, predefined, outputs:
 (defun start-sender-fn (name category-spec output-spec 
 			sender-type &rest args)
   ;; stop any current one with the same name... warn?
-  (stop-sending name :warn-if-not-found-p nil)
+  (stop-sender-fn name :warn-if-not-found-p nil)
   (let ((sender (apply #'make-instance 
 		 sender-type 
 		 :name name
@@ -373,9 +387,9 @@ include strings and the special, predefined, outputs:
 
 (defmacro stop-sender (name)
   "Find the sender named `name` and stop it."
-  `(progn (stop-sending ',name) nil))
+  `(progn (stop-sender-fn ',name) nil))
 
-(defun stop-sending (name &key (warn-if-not-found-p t))
+(defun stop-sender-fn (name &key (warn-if-not-found-p t))
   (let ((sender (find name (log5-senders (log-manager)) 
 		      :key #'name))) 	
     (cond (sender
@@ -391,7 +405,7 @@ include strings and the special, predefined, outputs:
 (defun stop-all-senders ()
   "Stops all logging."
   (loop for sender in (log5-senders (log-manager)) do
-       (stop-sending (name sender))))
+       (stop-sender-fn (name sender))))
 
 (defun senders ()
   "Returns a list of the current senders."
@@ -468,40 +482,48 @@ include strings and the special, predefined, outputs:
 	  new-array)
     sender))
 
+(defmacro %with-vars (vars default &body body)
+  ;; an implementation one-off thing; don't cring when you see it <smile>
+  `(progv ',vars ',(make-list (length vars) :initial-element default)
+     (locally
+	 #+sbcl (declare (sb-ext:disable-package-locks ,@vars))
+	 (declare (special ,@vars))
+	 ,@body)))
+
 (defun sender-responds-to-category-p (sender-spec category-spec)
-  (let* ((cat-positive (category-variables category-spec))
+  (#+sbcl
+   sb-ext:without-package-locks
+   #-sbcl
+   progn
+   (let* ((cat-positive (category-variables category-spec))
 	 (cat-negative (category-negated-variables category-spec))
 	 (sender-variables (determine-category-variables sender-spec))
 	 (sender-free (remove-if (lambda (x)
 				   (or (member x cat-positive)
 				       (member x cat-negative)))
 				 sender-variables)))
-    (progv cat-positive (make-list (length cat-positive)
-				   :initial-element t) 
-      (progv cat-negative (make-list (length cat-negative)
-				     :initial-element nil)
-	(progv sender-free (make-list (length sender-free)
-				      :initial-element nil)
-;	  (print sender-spec)
-;	  (print cat-positive)
-;	  (print cat-negative)
-;	  (print sender-free)
-	  (eval sender-spec))))))
+    (eval
+     `(%with-vars ,cat-positive t
+	(%with-vars ,cat-negative nil
+	  (%with-vars ,sender-free nil
+	    ,sender-spec)))))))
 
 (defun build-handle-message-fn (sender)
-  `(lambda (category-id sender message)
-     (let (,@(create-handle-message-context sender))
-       (unwind-protect
-	    (progn
-	      ,@(start-handling sender) 
-	      ,@(loop for name in (output-spec sender) 
-		   for output = (valid-output-p name) 
-		   for first? = t then nil
-		   unless output do (error 'output-not-found-error :name name)
-		   unless first? collect (separate-properties sender)
-		   when output collect 
-		   (handle-output sender output)))
-	 ,@(finish-handling sender)))))
+  (eval
+   `(lambda (category-id sender message)
+      (declare (ignorable category-id sender message))
+      (let (,@(create-handle-message-context sender))
+	(unwind-protect
+	     (progn
+	       ,@(start-handling sender) 
+	       ,@(loop for name in (output-spec sender) 
+		    for output = (valid-output-p name) 
+		    for first? = t then nil
+		    unless output do (error 'output-not-found-error :name name)
+		    unless first? collect (separate-properties sender)
+		    when output collect 
+		    (handle-output sender output)))
+	  ,@(finish-handling sender))))))
 
 (defun valid-output-p (name)
   (or (predefined-output-p name)
@@ -531,7 +553,8 @@ include strings and the special, predefined, outputs:
   `((stream (output-stream sender))))
 
 (defmethod start-handling ((sender stream-sender-mixin)) 
-  `((file-position stream (file-length stream))
+  `((let ((file-length (ignore-errors (file-length stream))))
+      (when file-length (file-position stream (file-length stream))))
     (fresh-line stream)))
 
 (defmethod finish-handling ((sender stream-sender-mixin))
@@ -611,7 +634,7 @@ include strings and the special, predefined, outputs:
       `(values)
       `(let ((category (load-time-value 
 			(update-category-spec nil ',category-spec)
-			:read-only-p t)))
+			t)))
 	 (handle-message
 	  (category-id category)
 	  ,message
