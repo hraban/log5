@@ -16,6 +16,7 @@
 		 (:file "definitions" :depends-on ("package"))
 		 (:file "unit-tests" :depends-on ("definitions"))
 		 (:file "tests" :depends-on ("definitions"))
+		 (:file "speed-test" :depends-on ("definitions"))
 		 )))
   :depends-on (:lift :log5))
 
