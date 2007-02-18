@@ -363,7 +363,7 @@ include strings and the special, predefined, outputs:
 * category - the value of the category of the current message
 "
   `(start-sender-fn
-    ',name 
+    ,name 
     ',category-spec
     ',output-spec
     ',sender-type 
@@ -387,7 +387,7 @@ include strings and the special, predefined, outputs:
 
 (defmacro stop-sender (name)
   "Find the sender named `name` and stop it."
-  `(progn (stop-sender-fn ',name) nil))
+  `(progn (stop-sender-fn ,name) nil))
 
 (defun stop-sender-fn (name &key (warn-if-not-found-p t))
   (let ((sender (find name (log5-senders (log-manager)) 
@@ -509,7 +509,8 @@ include strings and the special, predefined, outputs:
 	    ,sender-spec)))))))
 
 (defun build-handle-message-fn (sender)
-  (eval
+  (compile 
+   nil
    `(lambda (category-id sender message)
       (declare (ignorable category-id sender message))
       (let (,@(create-handle-message-context sender))
@@ -639,6 +640,15 @@ include strings and the special, predefined, outputs:
 	  (category-id category)
 	  ,message
 	  ,@args))))
+
+;;?? if I'm right, it would be faster to call the log-test first and
+;; then the predicate only if we're logging...
+(defmacro log-if (predicate category-spec message &rest args)
+  (declare (dynamic-extent args))
+  (if (member :no-logging *features*)
+      `(values)
+      `(when ,predicate 
+	(log-for ,category-spec ,message ,@args))))
 
 
 ;;;;; context
