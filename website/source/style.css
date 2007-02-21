@@ -67,7 +67,7 @@ a:hover { text-decoration: underline; }
 	
 }
 
-/*<group=toc>*/
+/* @group toc */
 
 .table-of-contents {
 	font-size: 90%;
@@ -97,4 +97,4 @@ a:hover { text-decoration: underline; }
 	left: 8px;
 }
 	
-/*</group>*/
+/* @end */

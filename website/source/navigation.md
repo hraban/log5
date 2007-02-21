@@ -1,3 +1,6 @@
 <div id="navigation">
-[User's Guide][user-guide]
+* [Overview][]
+* [User's Guide][user-guide]
+* [Changelog][log5-changelog]
+* [Other Software][metabang-software]
 </div>
