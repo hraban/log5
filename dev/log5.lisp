@@ -554,8 +554,8 @@ include strings and the special, predefined, outputs:
   `((stream (output-stream sender))))
 
 (defmethod start-handling ((sender stream-sender-mixin)) 
-  `((let ((file-length (ignore-errors (file-length stream))))
-      (when file-length (file-position stream (file-length stream))))
+  `((when (typep stream 'file-stream)
+      (file-position stream :end))
     (fresh-line stream)))
 
 (defmethod finish-handling ((sender stream-sender-mixin))
