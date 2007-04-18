@@ -376,10 +376,15 @@ static but the process id of the current Lisp is)."
 (defun output-specs ()
   "Returns a list of the current output specs in alphatetical order."
   (sort
-   (collect-key-value 
-    *output-specs*
-    :transform (lambda (k v) (declare (ignore v)) k))
+   (nconc
+    (collect-key-value 
+     *output-specs*
+     :transform (lambda (k v) (declare (ignore v)) k))
+    (built-in-output-specs))
    #'string-lessp))
+
+(defun built-in-output-specs ()
+  (copy-list '(category message first-context context)))
 
 (defun category-specs ()
   "Returns a list of the defined category specs in alphatetical order."
