@@ -437,6 +437,11 @@ include strings and the special, predefined, outputs:
 		 ,@(when category-spec
 			 `(:category-spec ,category-spec))))
 
+(defmacro quick-sender (name category-spec)
+  `(start-sender ,name (stream-sender :location *standard-output*)
+		 :output-spec '(message)
+		 :category-spec ,category-spec))
+
 (defun start-sender-fn (name category-spec output-spec 
 			sender-type &rest args)
   ;; stop any current one with the same name... warn?
@@ -486,7 +491,8 @@ include strings and the special, predefined, outputs:
    (handle-message-fn :reader handle-message-fn)
    (active-categories :reader active-categories
 		      :initform (make-array 0 :element-type 'bit)))
-  (:documentation "The root sender class from which all senders should descend."))
+  (:documentation "The root sender class from which all senders ~
+should descend."))
 
 (defmethod print-object ((sender basic-sender) stream)
   (print-unreadable-object (sender stream :type t :identity t)
@@ -718,13 +724,6 @@ include strings and the special, predefined, outputs:
 
 ;;;;; messages 
 
-#+(or)
-(defmacro with-logging (category-spec &body body)
-  (cond ((member :no-logging *features*)
-	 `(values))
-	((and (log5-compile-time-category-spec (log-manager))
-	      ))))
-
 (defmacro log-for (category-spec message &rest args)
   (if (member :no-logging *features*)
       `(values)
@@ -782,37 +781,6 @@ include strings and the special, predefined, outputs:
 	       (do-it))))))
 
 
-#|
-;;;;; with-logging
-
-(defmacro with-logging ((&key name (period 10) reset-log? path)
-			       &body body)
-  (assert (and (numberp period) (plusp period)))
-  (assert (not (null path)))
-  (with-gensyms (process)
-    `(let ((,process (mp:process-run-function 
-	`	     "memory-logger" #'memory-logger
-		     ,name ,period ,path ,reset-log?)))
-      (unwind-protect
-	   (progn ,@body)
-	(mp:process-kill ,process)))))
-
-(defun memory-logger (name period path reset-log?)
-  (with-logging (path :reset-log? reset-log?)
-    (loop do
-	 (log-message (memory-log-message name))
-	 (sleep period))))
-
-(defun memory-log-message (name)
-  (with-output-to-string (out)
-    (format out "~%~a " name)
-    (format out " ~{~{~s ~} ~}" 
-	    (delete-if 
-	     (lambda (pair) 
-	       (not (member (first pair) 
-			    '(:%CPU :%MEM :VSZ :RSS)))) 
-	     (os-process-info)))))
-|#
 ;;;;; utilities
 
 (defun flatten (list)
