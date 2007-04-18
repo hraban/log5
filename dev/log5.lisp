@@ -620,6 +620,23 @@ include strings and the special, predefined, outputs:
    (close-stream? :reader close-stream?)
    (location :initarg :location :reader location)))
 
+
+(defmethod create-handle-message-context ((sender stream-sender-mixin))
+  `((stream (make-string-output-stream))))
+
+(defmethod start-handling ((sender stream-sender-mixin)) 
+  `())
+
+(defmethod finish-handling ((sender stream-sender-mixin))
+  `((let ((output (output-stream sender)))
+      (when (open-stream-p output)
+	(when (typep output 'file-stream)
+	  (file-position output :end))
+	(fresh-line output)
+	(princ (get-output-stream-string stream) output) 
+	(force-output output)))))
+
+#|
 (defmethod create-handle-message-context ((sender stream-sender-mixin))
   `((stream (output-stream sender))))
 
@@ -630,6 +647,7 @@ include strings and the special, predefined, outputs:
 
 (defmethod finish-handling ((sender stream-sender-mixin))
   `((force-output stream)))
+|#
 
 (defmethod separate-properties ((sender stream-sender-mixin))
   `(princ #\Space stream))
