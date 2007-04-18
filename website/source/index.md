@@ -20,7 +20,7 @@ For more details, see the [overview][] or the [user-guide][].
 
 ### Getting Log5
 
-A decent version of log5 has been implemented but be warned that the API is still in flux. 
+A decent version of log5 has been implemented and the API has stabilized. There may be some additional changes but I expect that they will be small. 
 
 You can help calm the flux by looking at the [darcs][] repository
 

@@ -11,12 +11,14 @@
   [user-guide]: user-guide.html
   [metabang-software]: http://www.metabang.com/open-source-software.html
   [log5-mailing-list]: http://common-lisp.net/cgi-bin/mailman/listinfo/log5-devel
+  [log5-email]: mailto:log5-devel@common-lisp.net
   [unCLog]: http://unclog.metabang.com/
   [ndc]: http://logging.apache.org/log4j/docs/api/org/apache/log4j/NDC.html
   [logger]: http://logging.apache.org/log4j/docs/api/org/apache/log4j/Logger.html
   [appender]: http://logging.apache.org/log4j/docs/api/org/apache/log4j/Appender.html
   [mit-license]: http://www.opensource.org/licenses/mit-license.php
   [Overview]: overview.html
+  [FAQ]: faq.html
   
 <div id="header">
 {include navigation.md}

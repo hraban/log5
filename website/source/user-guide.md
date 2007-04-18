@@ -49,7 +49,7 @@ A good general strategy is to build categories that fit the application and then
 
 To collect log data, you must start a `sender`. Senders filter log messages based on a category specification and send the messages that pass on to their destination. For example, this stream-sender will write out (to `*error-output*` every log message that includes the tag `warn`, `error`, or `fatal` (because that is what `warn+` expands into).
 
-    (start-sender warnings-and-worse
+    (start-sender 'warnings-and-worse
       (stream-sender :location *error-output*)
       :category-spec (warning+)
       :output-spec (time message load-average context))
@@ -89,7 +89,11 @@ As alluded to in the description of outputs, log5 provides a place to put a desc
 One way to configure log5 is by placing calls to `start-sender` in your code. This might be a good thing to do for an error log that you're sure you'd always like to have running but it lacks flexibility! The better way is to choose a good place to put a configuration file and then use the `configure-from-file` method. A configuration file looks almost like a set of calls to start-sender (no XML madness for us!) using the format `(name (type [keyword value]*) (output*) (category*))`. For example:
 
 
-    (index-log (log5:stream-sender             :location "/tmp/index.log")     (time db-name log5:category log5:message os-process-id human-time)     (and trace+ (or index merge)))
+    (index-log (log5:stream-sender 
+               :location "/tmp/index.log")
+               (time db-name log5:category log5:message 
+                     os-process-id human-time)
+               (and trace+ (or index merge)))
 
 
 will start up a log to /tmp/index.log containing a log-messages about indexing and merging that are of level trace or higher. The configuration file is read
