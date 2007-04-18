@@ -501,7 +501,8 @@ include strings and the special, predefined, outputs:
 (defmethod initialize-instance :after ((object basic-sender) &key 
 				       )
   (setf (slot-value object 'handle-message-fn)
-	(build-handle-message-fn object)))
+	(compile-handle-message-fn 
+	 (build-handle-message-fn object))))
 
 (defmethod update-active-categories ((sender basic-sender) max-id)
   (setf (slot-value sender 'active-categories)
@@ -576,23 +577,24 @@ include strings and the special, predefined, outputs:
 	   (%with-vars ,sender-free nil
 	     ,sender-spec)))))))
 
+(defun compile-handle-message-fn (fn)
+  (compile nil fn))
+  
 (defun build-handle-message-fn (sender)
-  (compile 
-   nil
-   `(lambda (category-id sender message)
-      (declare (ignorable category-id sender message))
-      (let (,@(create-handle-message-context sender))
-	(unwind-protect
-	     (progn
-	       ,@(start-handling sender) 
-	       ,@(loop for name in (output-spec sender) 
-		    for output = (valid-output-p name) 
-		    for first? = t then nil
-		    unless output do (error 'output-not-found-error :name name)
-		    unless first? collect (separate-properties sender)
-		    when output collect 
-		    (handle-output sender output)))
-	  ,@(finish-handling sender))))))
+  `(lambda (category-id sender message)
+     (declare (ignorable category-id sender message))
+     (let (,@(create-handle-message-context sender))
+       (unwind-protect
+	    (progn
+	      ,@(start-handling sender) 
+	      ,@(loop for name in (output-spec sender) 
+		   for output = (valid-output-p name) 
+		   for first? = t then nil
+		   unless output do (error 'output-not-found-error :name name)
+		   unless first? collect (separate-properties sender)
+		   when output collect 
+		   (handle-output sender output)))
+	 ,@(finish-handling sender)))))
 
 (defun valid-output-p (name)
   (or (predefined-output-p name)
