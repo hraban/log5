@@ -117,6 +117,26 @@
   "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugging. This is setfable."
   (setf (log5-ignore-errors? (log-manager)) (not (null value))))
 
+(defmacro handle-message (id message &rest args)
+  ;; needs to be a macro to delay evaluation of args...
+  (let ((gid (gensym)))
+    `(let ((output nil)
+	   (,gid ,id))
+       (dolist (sender (log5-senders (log-manager)))
+	 ;; check for new category and fix things up
+	 (when (>= ,gid (length (active-categories sender)))
+	   ;;?? how pricy is this?
+	   (update-active-categories sender ,gid))
+	 (when (= (aref (active-categories sender) ,gid) 1)
+	   (funcall (handle-message-fn sender) ,gid sender
+		    (or output
+			(setf output
+			      (let ((*print-pretty* nil))
+				,(if args 
+				     `(format nil ,message ,@args) message)))))
+	   (values t))))))
+
+#+(or)
 (defun handle-message (id message &rest args)
   (declare (dynamic-extent args))
   (let ((output nil))
@@ -132,8 +152,9 @@
 	(funcall (handle-message-fn sender) id sender
 		 (or output
 		     (setf output
-			   (if args 
-			       (apply #'format nil message args) message))))
+			   (let ((*print-pretty* nil))
+			     (if args 
+				 (apply #'format nil message args) message)))))
 	(values t)))))
 
 ;;?? see above, merge / refactor
