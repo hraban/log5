@@ -1,8 +1,11 @@
+Be nice to have when-logging to wrap extra code. But 
+  what would when-logging mean? When any sender is active for
+  the category? A separate. similar non-sender sender...?
+  maybe that?
 
+- with-context-for category context &body body
 
-lift: if there is an error in teardown, can't create test, don't get error
-asdf: (:perform (test-op :load-op) doesn't seem to always load
-  
+- compile-time-category-spec (how do you use this?)
 
 sender name should be canonized
 
