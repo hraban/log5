@@ -15,14 +15,17 @@
 	   #:log-message
 	   #:log-if
 	   #:log-for
+	   #:when-logging
 	   #:senders			;
 	   #:start-sender		;
+	   #:start-stream-sender
 	   #:stop-sender		;
 	   #:stop-all-senders		;
 	   #:context
 	   #:pop-context
 	   #:push-context
 	   #:with-context
+	   #:with-context-for
 	   #:defoutput			;
 	   ;; manager
 	   #:ignore-errors-p		;
@@ -71,12 +74,6 @@
 
 (defparameter *default-logical-connective* 'or)
 
-(defvar *log-manager* nil)
-
-(defun log-manager ()
-  "Returns the component that handles all of log5's bookkeeping."
-  (or *log-manager* (setf *log-manager* (make-log-manager))))
-
 (define-condition sender-not-found-warning (warning)
   ((sender-name :initform nil :reader sender-name :initarg :sender-name))
   (:report (lambda (c s)
@@ -100,11 +97,17 @@
 	     (format s "There is no output-specification named ~s. Use defoutput to define output specifications before using them in a sender."
 		     (name c)))))
 
-
 (defstruct (log-manager (:conc-name log5-))
   senders
   context
-  ignore-errors?)
+  ignore-errors?
+  compile-time-category-spec)
+
+(defvar *log-manager* nil)
+
+(defun log-manager ()
+  "Returns the component that handles all of log5's bookkeeping."
+  (or *log-manager* (setf *log-manager* (make-log-manager))))
 
 (defun ignore-errors-p ()
   "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugging. This is setfable."
@@ -133,6 +136,16 @@
 			       (apply #'format nil message args) message))))
 	(values t)))))
 
+;;?? see above, merge / refactor
+(defun active-category-p (id)
+  (some (lambda (sender)
+	  ;; check for new category and fix things up
+	  (when (>= id (length (active-categories sender)))
+	    ;;?? how pricy is this?
+	    (update-active-categories sender id))
+	  (= (aref (active-categories sender) id) 1))
+	(log5-senders (log-manager))))
+	
 
 #|
 (defcategory :error)
@@ -369,6 +382,14 @@ include strings and the special, predefined, outputs:
     ',sender-type 
     ,@args))
     
+(defmacro start-stream-sender (name location &key output-spec category-spec)
+  `(start-sender ,name
+		 (stream-sender :location ,location)
+		 ,@(when output-spec
+			 `(:output-spec ,output-spec))
+		 ,@(when category-spec
+			 `(:category-spec ,category-spec))))
+
 (defun start-sender-fn (name category-spec output-spec 
 			sender-type &rest args)
   ;; stop any current one with the same name... warn?
@@ -490,23 +511,23 @@ include strings and the special, predefined, outputs:
 	 (declare (special ,@vars))
 	 ,@body)))
 
-(defun sender-responds-to-category-p (sender-spec category-spec)
+(defun sender-responds-to-category-p (sender-spec category)
   (#+sbcl
    sb-ext:without-package-locks
    #-sbcl
    progn
-   (let* ((cat-positive (category-variables category-spec))
-	 (cat-negative (category-negated-variables category-spec))
-	 (sender-variables (determine-category-variables sender-spec))
-	 (sender-free (remove-if (lambda (x)
-				   (or (member x cat-positive)
-				       (member x cat-negative)))
-				 sender-variables)))
-    (eval
-     `(%with-vars ,cat-positive t
-	(%with-vars ,cat-negative nil
-	  (%with-vars ,sender-free nil
-	    ,sender-spec)))))))
+   (let* ((cat-positive (category-variables category))
+	  (cat-negative (category-negated-variables category))
+	  (sender-variables (determine-category-variables sender-spec))
+	  (sender-free (remove-if (lambda (x)
+				    (or (member x cat-positive)
+					(member x cat-negative)))
+				  sender-variables)))
+     (eval
+      `(%with-vars ,cat-positive t
+	 (%with-vars ,cat-negative nil
+	   (%with-vars ,sender-free nil
+	     ,sender-spec)))))))
 
 (defun build-handle-message-fn (sender)
   (compile 
@@ -630,6 +651,13 @@ include strings and the special, predefined, outputs:
 
 ;;;;; messages 
 
+#+(or)
+(defmacro with-logging (category-spec &body body)
+  (cond ((member :no-logging *features*)
+	 `(values))
+	((and (log5-compile-time-category-spec (log-manager))
+	      ))))
+
 (defmacro log-for (category-spec message &rest args)
   (if (member :no-logging *features*)
       `(values)
@@ -640,6 +668,15 @@ include strings and the special, predefined, outputs:
 	  (category-id category)
 	  ,message
 	  ,@args))))
+
+(defmacro when-logging (category-spec &body body)
+  (if (member :no-logging *features*)
+      `(values)
+      `(let ((category (load-time-value 
+			(update-category-spec nil ',category-spec)
+			t)))
+	 (when (active-category-p (category-id category))
+	   ,@body))))
 
 ;;?? if I'm right, it would be faster to call the log-test first and
 ;; then the predicate only if we're logging...
@@ -664,6 +701,19 @@ include strings and the special, predefined, outputs:
 	(progn (push-context ,context)
 	       ,@body)
      (pop-context)))
+
+(defmacro with-context-for (category-spec context &body body)
+  (if (member :no-logging *features*)
+      `(values)
+      `(flet ((do-it ()
+		,@body))
+	 (let ((category (load-time-value 
+			  (update-category-spec nil ',category-spec)
+			  t)))
+	   (if (active-category-p (category-id category))
+	       (with-context ,context (do-it))
+	       (do-it))))))
+
 
 #|
 ;;;;; with-logging
@@ -717,3 +767,4 @@ include strings and the special, predefined, outputs:
   (and (consp putative-pair)
        (cdr putative-pair)
        (not (consp (cdr putative-pair)))))
+
