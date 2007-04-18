@@ -424,8 +424,8 @@ include strings and the special, predefined, outputs:
 "
   `(start-sender-fn
     ,name 
-    ',category-spec
-    ',output-spec
+    ,category-spec
+    ,output-spec
     ',sender-type 
     ,@args))
     
