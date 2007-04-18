@@ -54,6 +54,7 @@
 	   ;; output
 	   #:time #:category #:message
 	   ;; configuration
+	   #:configuration-file
 	   #:configure-from-file))
 
 (in-package #:log5)
@@ -167,6 +168,26 @@
 	  (= (aref (active-categories sender) id) 1))
 	(log5-senders (log-manager))))
 	
+(defun configuration-file (&key (name "logging") (type "config")
+			   (prefer-current-directory-p t))
+  "Returns the path to the standard log5 configuration file. This is used by `configure-from-file` to setup logging activitiy. `Configuration-file looks in the 
+user's home directory (using `user-homedir-pathname`) and the directory specified by `*default-pathname-defaults*`. The default is to use a file named \"logging.config\" but you can use the `:name` and `:type` parameters to customize this. If files exist in both directories, the `configuration-file` will use the one in the home directory unless `:prefer-current-directory-p` is true."
+  (let ((current-file (probe-file
+		       (make-pathname 
+			:name name
+			:type type)))
+        (home-file (probe-file 
+		    (make-pathname
+		     :name name
+		     :type type
+		     :directory `(,@(pathname-directory
+				     (user-homedir-pathname))
+				    ".allegrograph")))))
+    (cond ((and prefer-current-directory-p current-file)
+	   current-file)
+	  (t
+	   (or home-file current-file)))))
+
 
 #|
 (defcategory :error)
