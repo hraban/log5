@@ -51,8 +51,8 @@ To collect log data, you must start a `sender`. Senders filter log messages base
 
     (start-sender 'warnings-and-worse
       (stream-sender :location *error-output*)
-      :category-spec (warning+)
-      :output-spec (time message load-average context))
+      :category-spec '(warning+)
+      :output-spec '(time message load-average context))
 
 The only unexplained bit is the `output-spec`. It describes the `outputs` of the sender.
 
@@ -72,7 +72,17 @@ Whenever a sender's output-spec includes `time`, the log messages it sends will 
 
 You should also note that your outputs can perform as much computation as you need them to. For example, this status-report output
 
-    (defoutput status-report        (let ((path (find-unused-pathname              (merge-pathnames              (make-pathname                :name "status-report-"               :directory '(:relative "logs"))              (data-directory))             ".log")))          (with-new-file (*standard-output* path)        (status-report))          path))
+    (defoutput status-report
+        (let ((path (find-unused-pathname 
+             (merge-pathnames
+              (make-pathname 
+               :name "status-report-"
+               :directory '(:relative "logs"))
+              (data-directory))
+             ".log")))
+          (with-new-file (*standard-output* path)
+        (status-report))
+          path))
 
 prints a status-report to a log file every time it is part of a sender's output-spec. It then includes only the path to the report in the actual log file. Since you don't want logging to incur too much overhead, you should be judicious in the computations you place in outputs.
 
