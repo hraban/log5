@@ -9,12 +9,12 @@
   (+ 1 loggers))
 
 (defun measure-log5-speed (loggers count)
-  (let ((x 0))
-    (lift::measure 
-     (lambda ()
-       (loop repeat count do
-	    (setf x (log5-speed-test loggers)))
-       x))))
+  (let ((x 0) s b)
+    (lift::measure s b 
+      (loop repeat count do
+	   (setf x (log5-speed-test loggers)))
+       x)
+    (values s b 0)))
 
 (defvar *handy-special-variable* nil)
 
@@ -35,14 +35,14 @@
      for i from 1 do
        (start-sender (intern (format nil "TEST-LOG-~d" i))
 		     (log5:stream-sender :location "/tmp/foo.log")
-		     :output-spec (time message)
-		     :category-spec (and info log5-speed-test)))
+		     :output-spec '(time message)
+		     :category-spec '(and info log5-speed-test)))
   (loop repeat senders-that-ignore 
      for i from 1 do
        (start-sender (intern (format nil "TEST-IGNORE-~d" i))
 		     (log5:stream-sender :location "/tmp/foo.log")
-		     :output-spec (time message)
-		     :category-spec (and dribble log5-speed-test)))
+		     :output-spec '(time message)
+		     :category-spec '(and dribble log5-speed-test)))
   (setf *handy-special-variable* 
 	(list senders-that-log senders-that-ignore))
   (benchmark-with-loggers count logger-counts))
@@ -64,15 +64,15 @@
 
 #|
 #+(or)
-(benchmark-log5 '((0 0 0 10000)
-		  (0 0 10 10000)
-		  (0 0 20 10000)
-		  (10 0 0 10000)
-		  (10 0 10 10000)
-		  (10 0 20 10000)
-		  (0 10 0 10000)
-		  (0 10 10 10000)
-		  (0 10 20 10000)))
+(benchmark-log5 '((0 0 0 1000)
+		  (0 0 10 1000)
+		  (0 0 20 1000)
+		  (10 0 0 1000)
+		  (10 0 10 1000)
+		  (10 0 20 1000)
+		  (0 10 0 1000)
+		  (0 10 10 1000)
+		  (0 10 20 1000)))
 
 (defun rpt (data)
   (format t "~&Active ~vTIgnoring ~vTLoggers ~vTLoops ~vT Seconds ~vTConses ~vTSeconds"
@@ -89,6 +89,13 @@
 		 (if (plusp (* (+ active ignoring) loggers loops))
 		     (/ seconds (* (+ active ignoring) loggers loops))
 		     (/ seconds (* (max loggers 1) loops)))))))
+
+(rpt 
+ '(((1000 0 0.0d0 80 (0 0))) ((1000 10 0.001d0 80 (0 0)))
+    ((1000 20 0.0d0 80 (0 0))) ((1000 0 0.0d0 80 (10 0)))
+    ((1000 10 7.501d0 876356776 (10 0)))
+    ((1000 20 14.77d0 1752732464 (10 0))) ((1000 0 0.0d0 96 (0 10)))
+    ((1000 10 0.009d0 96 (0 10))) ((1000 20 0.016d0 96 (0 10)))))
 
 (rpt
 ;; with senders, still no trouble
@@ -182,24 +189,27 @@ Times below 1.0% will be suppressed.
 log5-test> 
 
 ;; 0.86
+#+(or)
 (progn 
   (when (probe-file "/tmp/bar.log")
     (delete-file "/tmp/bar.log"))
-  (lift::measure 
-   (lambda ()
-     (with-open-file (s "/tmp/bar.log" :if-exists :supersede
-			:if-does-not-exist :create :direction :output)
-       (loop repeat 10000 do
-	    (let ((file-length (ignore-errors (file-length s))))
-	      (when file-length (file-position s (file-length s)))
-	      (fresh-line s)
-	      (princ (get-universal-time) s)
-	      (princ #\Space s)
-	      (princ "a message" s)
-	      (terpri s)
-	      (force-output s)))))))
+  (let (s b)
+    (lift::measure s b
+      (with-open-file (s "/tmp/bar.log" :if-exists :supersede
+			 :if-does-not-exist :create :direction :output)
+	(loop repeat 10000 do
+	     (let ((file-length (ignore-errors (file-length s))))
+	       (when file-length (file-position s (file-length s)))
+	       (fresh-line s)
+	       (princ (get-universal-time) s)
+	       (princ #\Space s)
+	       (princ "a message" s)
+	       (terpri s)
+	       (force-output s)))))
+    (values s b)))
 
 ;; 0.39
+#+(or)
 (progn 
   (when (probe-file "/tmp/bar.log")
     (delete-file "/tmp/bar.log"))
@@ -214,6 +224,7 @@ log5-test>
 	    (terpri s)
 	    (force-output s))))))
 
+#+(or)
 (lift::measure 
  (lambda ()
   (loop repeat 1000000 do
