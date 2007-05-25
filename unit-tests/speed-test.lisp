@@ -1,5 +1,7 @@
 (in-package #:log5-test)
 
+(setf (log5:compile-category-spec) nil)
+
 (defcategory log5-speed-test)
 
 (defun log5-speed-test (loggers)
@@ -58,21 +60,29 @@
 
 #|
 (prof:with-profiling (:type :time) 
-  (benchmark-with-senders 0 20 10000 10))
+  (benchmark-with-senders 0 20 1000000 (list 10)))
 (prof:show-flat-profile)
 |#
 
 #|
 #+(or)
-(benchmark-log5 '((0 0 0 1000)
-		  (0 0 10 1000)
-		  (0 0 20 1000)
-		  (10 0 0 1000)
-		  (10 0 10 1000)
-		  (10 0 20 1000)
-		  (0 10 0 1000)
-		  (0 10 10 1000)
-		  (0 10 20 1000)))
+(let ((count 1000))
+  (rpt 
+   (benchmark-log5 `((0 0 0 ,count)
+		     (0 0 10 ,count)
+		     (0 0 20 ,count)
+		     (10 0 0 ,count)
+		     (10 0 10 ,count)
+		     (10 0 20 ,count)
+		     (0 10 0 ,count)
+		     (0 10 10 ,count)
+		     (0 10 20 ,count)))))
+
+(benchmark-log5 '((1 1 2 10000)))
+
+(untrace)
+(trace log5::update-active-categories)
+(trace log5-speed-test)
 
 (defun rpt (data)
   (format t "~&Active ~vTIgnoring ~vTLoggers ~vTLoops ~vT Seconds ~vTConses ~vTSeconds"

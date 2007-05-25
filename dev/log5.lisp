@@ -48,12 +48,15 @@
 	   #:close-stream?
 	   #:output-stream
 	   #:name
+	   #:debug-category-spec
+	   #:undebug-category-spec
 	   ;; standard 'levels'
 	   #:fatal #:error #:warn #:info #:trace #:dribble
 	    #:error+ #:warn+ #:info+ #:trace+ #:dribble+
 	   ;; output
 	   #:time #:category #:message
 	   ;; configuration
+	   #:compile-category-spec
 	   #:configuration-file
 	   #:configure-from-file))
 
@@ -102,13 +105,26 @@
   senders
   context
   ignore-errors?
-  compile-time-category-spec)
+  compile-category-spec
+  expanded-compile-category-spec
+  debug-console)
 
 (defvar *log-manager* nil)
+
+#+(or)
+(setf *log-manager* nil)
 
 (defun log-manager ()
   "Returns the component that handles all of log5's bookkeeping."
   (or *log-manager* (setf *log-manager* (make-log-manager))))
+
+(defun compile-category-spec ()
+  (log5-compile-category-spec (log-manager)))
+
+(defun (setf compile-category-spec) (category-spec)
+  (setf (log5-expanded-compile-category-spec (log-manager))
+	(canonize-category-specification category-spec)
+	(log5-compile-category-spec (log-manager)) category-spec))
 
 (defun ignore-errors-p ()
   "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugging. This is setfable."
@@ -120,52 +136,50 @@
 
 (defmacro handle-message (id message &rest args)
   ;; needs to be a macro to delay evaluation of args...
-  (let ((gid (gensym)))
-    `(let ((output nil)
-	   (,gid ,id))
-       (dolist (sender (log5-senders (log-manager)))
-	 ;; check for new category and fix things up
-	 (when (>= ,gid (length (active-categories sender)))
-	   ;;?? how pricy is this?
-	   (update-active-categories sender ,gid))
-	 (when (= (aref (active-categories sender) ,gid) 1)
-	   (funcall (handle-message-fn sender) ,gid sender
-		    (or output
-			(setf output
-			      (let ((*print-pretty* nil))
-				,(if args 
-				     `(format nil ,message ,@args) message)))))
-	   (values t))))))
+  (let ((gid (gensym)) 
+	(goutput (gensym))
+	(gconsole (gensym))
+	(gmanager (gensym))
+	(gforce-output (gensym)))
+    `(let* ((,goutput nil)
+	    (,gid ,id)
+	    (,gmanager (log-manager))
+	    (,gconsole (log5-debug-console ,gmanager)))
+       (labels ((,gforce-output ()
+		  (or ,goutput 
+		      (setf ,goutput
+			    (let ((*print-pretty* nil))
+			      ,(if args 
+				   `(format nil ,message ,@args) message)))))
+		(handle-message-for-sender (sender)
+		  (update-active-categories sender ,gid)
+		  (when (= (sbit (active-categories sender) ,gid) 1)
+		    (funcall (handle-message-fn sender) 
+			     ,gid sender (,gforce-output)))))
+	 ;; maybe 'map-senders'
+	 (dolist (sender (log5-senders ,gmanager))
+	   (handle-message-for-sender sender))
+	 (when ,gconsole
+	   (handle-message-for-sender ,gconsole))
+	 ,goutput))))
 
 #+(or)
-(defun handle-message (id message &rest args)
-  (declare (dynamic-extent args))
-  (let ((output nil))
-    (dolist (sender (log5-senders (log-manager)))
-      ;; check for new category and fix things up
-      (when (>= id (length (active-categories sender)))
-	;;?? how pricy is this?
-	(update-active-categories sender id))
-      #+(or)
-      (format t "~&~a ~d ~a" 
-	      sender id (aref (active-categories sender) id))
-      (when (= (aref (active-categories sender) id) 1)
-	(funcall (handle-message-fn sender) id sender
-		 (or output
-		     (setf output
-			   (let ((*print-pretty* nil))
-			     (if args 
-				 (apply #'format nil message args) message)))))
-	(values t)))))
+(defun handle-message-for-sender (sender id message args output)
+  (update-active-categories sender id)
+  (when (= (sbit (active-categories sender) id) 1)
+    (funcall (handle-message-fn sender) id sender
+	     (or output
+		 (setf output
+		       (let ((*print-pretty* nil))
+			 (if args 
+			     (apply #'format nil message args) message)))))
+    output))
 
 ;;?? see above, merge / refactor
 (defun active-category-p (id)
   (some (lambda (sender)
-	  ;; check for new category and fix things up
-	  (when (>= id (length (active-categories sender)))
-	    ;;?? how pricy is this?
-	    (update-active-categories sender id))
-	  (= (aref (active-categories sender) id) 1))
+	  (update-active-categories sender id)
+	  (= (sbit (active-categories sender) id) 1))
 	(log5-senders (log-manager))))
 	
 (defun configuration-file (&key (name "logging") (type "config")
@@ -227,9 +241,10 @@ of a complex category like
     (defcategory non-file-foo (and (or foo bar biz) (not file-access)))
 
 Specifically, a simple category is just a name whereas a complex category is a boolean combination of other categories (either simple or complex). See `category-specs` if you want a list of defined categories." 
-  `(update-category-spec 
-    ',name ',category-spec
-    ,@(when documentation `(:documentation ,documentation))))
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (update-category-spec 
+      ',name ',category-spec
+      ,@(when documentation `(:documentation ,documentation)))))
 
 (defstruct (log-category (:conc-name category-)
 			 (:print-object print-category)) 
@@ -329,18 +344,6 @@ Specifically, a simple category is just a name whereas a complex category is a b
 	(or (category-expanded-specification spec) name)
 	name)))
 
-(defcategory fatal)
-(defcategory error)
-(defcategory error+ (or error fatal))
-(defcategory warn)
-(defcategory warn+ (or warn error+))
-(defcategory info)
-(defcategory info+ (or info warn+))
-(defcategory trace)
-(defcategory trace+ (or trace info+))
-(defcategory dribble)
-(defcategory dribble+ (or dribble trace+))
-
 #|
 (defoutput message ...)
 (defoutput human-time ...)
@@ -437,11 +440,6 @@ include strings and the special, predefined, outputs:
 		 ,@(when category-spec
 			 `(:category-spec ,category-spec))))
 
-(defmacro quick-sender (name category-spec)
-  `(start-sender ,name (stream-sender :location *standard-output*)
-		 :output-spec '(message)
-		 :category-spec ,category-spec))
-
 (defun start-sender-fn (name category-spec output-spec 
 			sender-type &rest args)
   ;; stop any current one with the same name... warn?
@@ -490,7 +488,7 @@ include strings and the special, predefined, outputs:
    (output-spec :initarg :output-spec :reader output-spec)
    (handle-message-fn :reader handle-message-fn)
    (active-categories :reader active-categories
-		      :initform (make-array 0 :element-type 'bit)))
+		      :initform (make-category-array 0)))
   (:documentation "The root sender class from which all senders ~
 should descend."))
 
@@ -510,12 +508,6 @@ should descend."))
 	(compile-handle-message-fn 
 	 (build-handle-message-fn object))))
 
-(defmethod update-active-categories ((sender basic-sender) max-id)
-  (setf (slot-value sender 'active-categories)
-	(adjust-array (active-categories sender) (1+ max-id)
-		      :initial-element 0))
-  sender)
-
 (defclass sender-with-categories (basic-sender)
   ((category-spec :initarg :category-spec :reader category-spec)
    (expanded-specification :initform nil :reader expanded-specification))
@@ -523,39 +515,53 @@ should descend."))
 
 (defmethod initialize-instance :after ((object sender-with-categories) &key 
 				       )
-  (setf (slot-value object 'expanded-specification)
-	(canonize-category-specification (slot-value object 'category-spec))
-	(slot-value object 'active-categories)
-	(make-active-category-array object)))
+  (initialize-category-spec object))
+
+(defun initialize-category-spec (sender)
+  (setf (slot-value sender 'expanded-specification)
+	(canonize-category-specification (slot-value sender 'category-spec))
+	(slot-value sender 'active-categories)
+	(make-active-category-array sender)))
 
 (defun make-active-category-array (sender)
   (let* ((size (hash-table-count *category-specs*))
-	 (array
-	  (make-array size
-		      :fill-pointer size
-		      :element-type 'bit
-		      :initial-element 0
-		      :adjustable t)))
+	 (array (make-category-array size)))
     (maphash 
      (lambda (name category)
        (declare (ignore name))
-       (setf (aref array (category-id category))
+       (setf (sbit array (category-id category))
 	     (if (sender-responds-to-category-p
 		  (expanded-specification sender) category) 1 0)))
      *category-specs*)
     array))
 
+(defun make-category-array (size)
+  (make-array size
+	      :element-type 'bit
+	      :initial-element 0))
+
+(defmethod update-active-categories ((sender basic-sender) max-id)
+  (let ((current-max-id (length (active-categories sender))))
+    (when (>= max-id current-max-id)
+      (setf (slot-value sender 'active-categories)
+	    (make-category-array (1+ max-id)))
+      sender)))
+
 (defmethod update-active-categories ((sender sender-with-categories) max-id)
-  (let ((current-max-id (length (active-categories sender)))
-	(new-array (adjust-array (active-categories sender) (1+ max-id))))
-    (loop for index from current-max-id to max-id do
-	 (setf (aref new-array index)
-	       (if (sender-responds-to-category-p
-		    (expanded-specification sender) 
-		    (id->category index)) 1 0)))
-    (setf (slot-value sender 'active-categories)
-	  new-array)
-    sender))
+  (let ((current-max-id (length (active-categories sender))))
+    (when (>= max-id current-max-id)
+      (let ((old-array (active-categories sender))
+	    (new-array (make-category-array (1+ max-id))))
+	(loop for index from 0 below current-max-id do
+	     (setf (sbit new-array index) (sbit old-array index)))
+	(loop for index from current-max-id to max-id do
+	     (setf (sbit new-array index)
+		   (if (sender-responds-to-category-p
+			(expanded-specification sender) 
+			(id->category index)) 1 0)))
+	(setf (slot-value sender 'active-categories)
+	      new-array)
+	sender))))
 
 (defmacro %with-vars (vars default &body body)
   ;; an implementation one-off thing; don't cring when you see it <smile>
@@ -722,36 +728,96 @@ should descend."))
 (defclass stream-sender (stream-sender-mixin sender-with-categories)
   ())
 
+(defclass debug-console-sender (stream-sender)
+  ((specs :initform nil :accessor specs))
+  (:default-initargs
+   :location *debug-io*
+    :name 'debug-console
+    :output-spec '(message)
+    :category-spec nil))
+
+(defun find-or-create-debug-console ()
+  (or (log5-debug-console (log-manager))
+      (setf (log5-debug-console (log-manager))
+	    (make-instance 'debug-console-sender))))
+
+(defun debug-category-spec (&optional category-spec &key output-spec reset?) 
+  (declare (ignore output-spec))
+  (let ((console (find-or-create-debug-console)))
+    (when reset?
+      (setf (specs console) nil))
+    (cond (category-spec
+	   (let ((current-specs (specs console)))
+	     (handler-case
+		 (progn
+		   (setf (specs console) 
+			 (cond ((specs console)
+				(if (find category-spec (specs console)
+					  :test #'equal)
+				    (specs console)
+				    `(,@(specs console) ,category-spec)))
+			       (t
+				`(or ,category-spec)))
+			 (slot-value console 'category-spec) (specs console))
+		   (initialize-category-spec console))
+	       (error (c)
+		 ;(declare (ignore c))
+		 (setf (specs console) current-specs)
+		 (error c))))
+	   (specs console))
+	  (t
+	   (specs console)))))
+
+(defun undebug-category-spec (&optional category-spec)
+  (let ((console (find-or-create-debug-console)))
+    (cond (category-spec
+	   (setf (specs console) 
+		 (remove category-spec (specs console) :test #'equal)))
+	  (t
+	   (setf (specs console) nil)))
+    (setf (slot-value console 'category-spec) (specs console))
+    (initialize-category-spec console)
+    console))
+  
 ;;;;; messages 
 
+(defun %log-p (category-spec)
+  (and
+   (not (member :no-logging *features*))
+   (let ((compile-spec (log5-expanded-compile-category-spec (log-manager))))
+     (or (null compile-spec)
+	 (sender-responds-to-category-p 
+	  compile-spec 
+	  (update-category-spec nil category-spec))))))
+
 (defmacro log-for (category-spec message &rest args)
-  (if (member :no-logging *features*)
-      `(values)
+  (if (%log-p category-spec)
       `(let ((category (load-time-value 
 			(update-category-spec nil ',category-spec)
 			t)))
 	 (handle-message
 	  (category-id category)
 	  ,message
-	  ,@args))))
+	  ,@args))
+      `(values)))
 
 (defmacro when-logging (category-spec &body body)
-  (if (member :no-logging *features*)
-      `(values)
+  (if (%log-p category-spec)
       `(let ((category (load-time-value 
 			(update-category-spec nil ',category-spec)
 			t)))
 	 (when (active-category-p (category-id category))
-	   ,@body))))
+	   ,@body))
+      `(values)))
 
 ;;?? if I'm right, it would be faster to call the log-test first and
 ;; then the predicate only if we're logging...
 (defmacro log-if (predicate category-spec message &rest args)
   (declare (dynamic-extent args))
-  (if (member :no-logging *features*)
-      `(values)
+  (if (%log-p category-spec)
       `(when ,predicate 
-	(log-for ,category-spec ,message ,@args))))
+	(log-for ,category-spec ,message ,@args))
+      `(values)))
 
 
 ;;;;; context
@@ -769,8 +835,7 @@ should descend."))
      (pop-context)))
 
 (defmacro with-context-for (category-spec context &body body)
-  (if (member :no-logging *features*)
-      `(values)
+  (if (%log-p category-spec)
       `(flet ((do-it ()
 		,@body))
 	 (let ((category (load-time-value 
@@ -778,7 +843,8 @@ should descend."))
 			  t)))
 	   (if (active-category-p (category-id category))
 	       (with-context ,context (do-it))
-	       (do-it))))))
+	       (do-it))))
+      `(progn ,@body)))
 
 
 ;;;;; utilities
