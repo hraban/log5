@@ -2,7 +2,7 @@
 
 (defpackage #:log5
   (:use #:common-lisp)
-  (:documentation "A Common Lisp logging librart; CLLL? No, it's log5. Log5 is organized around 5 things:
+  (:documentation "A Common Lisp logging library; CLLL? No, it's log5. Log5 is organized around 5 things:
 
 * Categories, 
 * Senders,
