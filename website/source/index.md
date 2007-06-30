@@ -20,7 +20,7 @@ For more details, see the [overview][] or the [user-guide][].
 
 ### Getting Log5
 
-log5 is implemented and the API has stabilized. There may be some additional changes but I expect that they will be small. 
+log5 is implemented and stabile.  
 
 Metabang.com uses [darcs][] for source control; the log5 repository is at:
 
@@ -36,6 +36,8 @@ Share peace!
 
 
 ### Latest News 
+
+29 June 2007 - log5 is updated with compile-time log categories and a handy debugging facility. 
 
 19 April 2007 - log5 has seen a bunch of minor development over the last few months. The biggest changes are
 

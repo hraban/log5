@@ -1,5 +1,5 @@
 {include header.md}
-{set-property title Log5 - overview}
+{set-property title "Log5 - overview"}
 
 ### Overview 
 

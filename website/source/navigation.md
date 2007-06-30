@@ -3,6 +3,5 @@
 * [User's Guide][user-guide]
 * [Changelog][log5-changelog]
 * [FAQ][]
-* [Other Software][metabang-software]
-
+* [Reference][log5-reference-guide]
 </div>

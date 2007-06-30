@@ -6,5 +6,6 @@
 Log5 has an [MIT style][mit-license] license
 
 <br>
-<div id="timestamp">Last updated {today} at {now}</div>
+<span id='other-software'>[Other Software][metabang-software]</span>
+<span id="timestamp">Last updated {today} at {now}</span>
 </div>

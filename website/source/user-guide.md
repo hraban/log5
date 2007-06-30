@@ -1,10 +1,13 @@
+{include header.md}
+
 {set-property html yes}
-{set-property title Log5 User's Guide}
+{set-property title "Log5 User's Guide"}
 {set-property style-sheet user-guide}
+{set-property docs-package log5}
 
 # Log5 User's Guide
 
-{table-of-contents :start-at 2 :depth 3}
+{table-of-contents :start 2 :depth 3}
 
 ## Introduction
 
@@ -129,7 +132,7 @@ The largest open issues for log5 are
 
 * lack of self tests, 
 * there is only a single sender (which works for files and streams), and
-* log statements cannot be removed at compile time {footnote This is a nice feature that the Arnesi logger has and which will be stolen as soon as someone has time!}
+* no rolling log files
 
 There are probably many other missing bits and pieces; please let the [mailing list][] know.
 
@@ -141,3 +144,5 @@ There are probably many other missing bits and pieces; please let the [mailing l
  [del.icio.us]: http://del.icio.us
  [mailing list]: mailto:log5-devel@common-lisp.net
  [Arnesi]: http://common-lisp.net/project/bese/arnesi.html
+
+{include footer.md}

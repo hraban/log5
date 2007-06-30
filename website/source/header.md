@@ -1,11 +1,12 @@
 {set-property html yes}
 {set-property style-sheet style}
-{set-property author Gary Warren King}
+{set-property author "Gary Warren King"}
 
   [darcs]: http://www.darcs.net/
   [asdf-install]: http://common-lisp.net/project/asdf-install
   [tarball]: http://common-lisp.net/project/log5/log5_latest.tar.gz
   [log5-changelog]: changelog.html
+  [log5-reference-guide]: reference-guide.html
   [gwking]: http://www.metabang.com/
   [log5-cliki]: http://www.cliki.net/log5
   [user-guide]: user-guide.html
@@ -19,6 +20,10 @@
   [mit-license]: http://www.opensource.org/licenses/mit-license.php
   [Overview]: overview.html
   [FAQ]: faq.html
+  [del.icio.us]: http://del.icio.us
+  [mailto-log5]: mailto:log5-devel@common-lisp.net
+  [Arnesi]: http://common-lisp.net/project/bese/arnesi.html
+
   
 <div id="header">
 {include navigation.md}

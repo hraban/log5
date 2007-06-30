@@ -1,9 +1,9 @@
 {include header.md}
-{set-property title Log5 - Frequently Asked Questions}
+{set-property title "Log5 - Frequently Asked Questions"}
 
 # Frequently Asked Questions about log5
 
-{table-of-contents :start-at 2 :depth 3}
+{table-of-contents :start 2 :depth 3}
 
 ## Does once count as frequently?
 
@@ -27,8 +27,10 @@
 >    * speed (though it is already fast)
 >    * reporting
 
-> Reporting is probably the biggest hole but it's probably worth either starting another project or trying to make log5's output look enough like log4j that one could use Chainsaw.
+> Reporting is probably the biggest hole but it's probably worth either starting another project or trying to make log5's output look enough like log4j that one could use [Chainsaw][].
 
+ [chainsaw]: http://logging.apache.org/log4j/docs/chainsaw.html
+ 
 ## What else?
 
 > If you have a question that isn't addressed here, please let the log5 [development list][log5-email] know and we'll try to answer it soon.
