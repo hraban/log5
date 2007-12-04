@@ -1,5 +1,5 @@
 {include header.md}
-{set-property title Log5 - it's one more}
+{set-property title "Log5 - it's one more"}
 
 ### Introduction 
 
@@ -24,7 +24,7 @@ log5 is implemented and stabile.
 
 Metabang.com uses [darcs][] for source control; the log5 repository is at:
 
-    darcs get http://common-lisp.net/project/log5/darcs/log5
+    darcs get http://common-lisp.net/project/log5
 
 You can use [ASDF-Installing][asdf-install] or just download a [tarball][]. It's also on the [CLiki][log5-cliki]. Common-Lisp.net hosts the project's mailing list:
 
