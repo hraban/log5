@@ -1,3 +1,7 @@
+#|
+Nice to have undefcategory or the like
+|#
+
 (in-package #:common-lisp-user)
 
 (defpackage #:log5
@@ -456,8 +460,10 @@ include strings and the special, predefined, outputs:
     (push sender (log5-senders (log-manager)))
     sender))
 
-(defmacro stop-sender (name)
-  "Find the sender named `name` and stop it."
+(defmacro stop-sender (name &key (warn-if-not-found-p t))
+  "Find the sender named `name` and stop it. If the sender is not active, then
+a `sender-not-found-warning` will be signaled unless `warn-if-not-found-p` is
+set to nil."
   `(progn (stop-sender-fn ,name) nil))
 
 (defun stop-sender-fn (name &key (warn-if-not-found-p t))
@@ -576,18 +582,20 @@ should descend."))
    sb-ext:without-package-locks
    #-sbcl
    progn
-   (let* ((cat-positive (category-variables category))
-	  (cat-negative (category-negated-variables category))
-	  (sender-variables (determine-category-variables sender-spec))
-	  (sender-free (remove-if (lambda (x)
-				    (or (member x cat-positive)
-					(member x cat-negative)))
-				  sender-variables)))
-     (eval
-      `(%with-vars ,cat-positive t
-	 (%with-vars ,cat-negative nil
-	   (%with-vars ,sender-free nil
-	     ,sender-spec)))))))
+   (multiple-value-bind (sender-postivies sender-negatives)
+       (determine-category-variables sender-spec)
+     (let* ((cat-positive (category-variables category))
+	    (cat-negative (category-negated-variables category))
+	    (sender-variables (nconc sender-postivies sender-negatives))
+	    (sender-free (remove-if (lambda (x)
+				      (or (member x cat-positive)
+					  (member x cat-negative)))
+				    sender-variables)))
+       (eval
+	`(%with-vars ,cat-positive t
+	   (%with-vars ,cat-negative nil
+	     (%with-vars ,sender-free nil
+	       ,sender-spec))))))))
 
 (defun compile-handle-message-fn (fn)
   (compile nil fn))
