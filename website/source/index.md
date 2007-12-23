@@ -37,6 +37,8 @@ Share peace!
 
 ### Latest News 
 
+22 December 2007 - Some bug fixes and minor tweaks
+
 29 June 2007 - log5 is updated with compile-time log categories and a handy debugging facility. 
 
 19 April 2007 - log5 has seen a bunch of minor development over the last few months. The biggest changes are
