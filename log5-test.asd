@@ -11,13 +11,20 @@
   :licence "MIT License (see the fike COPYING for details)"
   :description "Log5 is a Common Lisp logging library"
   :components
-  ((:module "unit-tests"
+  ((:module 
+    "setup"
+    :pathname "unit-tests/"
     :components ((:file "package")
-		 (:file "definitions" :depends-on ("package"))
-		 (:file "unit-tests" :depends-on ("definitions"))
-		 (:file "tests" :depends-on ("definitions"))
-		 (:file "speed-test" :depends-on ("definitions"))
-		 )))
+		 (:file "definitions" :depends-on ("package"))))
+   (:module 
+    "unit-tests"
+    :depends-on ("setup")
+    :pathname "unit-tests/"
+    :components ((:file "unit-tests")
+		 (:file "tests")
+		 (:file "speed-test")
+		 (:file "test-negated-categories")
+			)))
   :depends-on (:lift :log5))
 
  
