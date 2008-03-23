@@ -18,3 +18,7 @@ to support compile-time category filtering
 (defcategory trace+ (or trace info+))
 (defcategory dribble)
 (defcategory dribble+ (or dribble trace+))
+
+(defcategory in-development nil
+  "Suggested use is to include in log messages you only want to see while
+developing your code.")

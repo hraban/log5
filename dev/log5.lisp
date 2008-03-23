@@ -56,7 +56,8 @@ Nice to have undefcategory or the like
 	   #:undebug-category-spec
 	   ;; standard 'levels'
 	   #:fatal #:error #:warn #:info #:trace #:dribble
-	    #:error+ #:warn+ #:info+ #:trace+ #:dribble+
+	   #:error+ #:warn+ #:info+ #:trace+ #:dribble+
+	   #:in-development
 	   ;; output
 	   #:time #:category #:message
 	   ;; configuration
