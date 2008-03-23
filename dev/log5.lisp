@@ -465,7 +465,7 @@ include strings and the special, predefined, outputs:
   "Find the sender named `name` and stop it. If the sender is not active, then
 a `sender-not-found-warning` will be signaled unless `warn-if-not-found-p` is
 set to nil."
-  `(progn (stop-sender-fn ,name) nil))
+  `(progn (stop-sender-fn ,name :warn-if-not-found-p ,warn-if-not-found-p) nil))
 
 (defun stop-sender-fn (name &key (warn-if-not-found-p t))
   (let ((sender (find name (log5-senders (log-manager)) 
