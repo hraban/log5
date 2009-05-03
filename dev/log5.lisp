@@ -661,6 +661,8 @@ should descend."))
    (close-stream? :reader close-stream? :initform nil)
    (location :initarg :location :reader location)))
 
+(defmethod initialize-instance :after ((object stream-sender-mixin) &key)
+  )
 
 (defmethod create-handle-message-context ((sender stream-sender-mixin))
   `((stream (make-string-output-stream))))
@@ -750,19 +752,6 @@ should descend."))
 			   :if-exists :append 
 			   #+(or) (if reset-log? :supersede :append)))
 		    (t (error "don't know how to log to ~a" location)))))))
-
-(defmethod initialize-instance :after ((object stream-sender-mixin) 
-				       &key location)
-  (setf (slot-value object 'close-stream?) (not (streamp location))
-	(slot-value object 'output-stream)
-	(cond ((streamp location) location)
-	      ((or (pathnamep location) (stringp location))
-	       (ensure-directories-exist location)
-	       (open location :direction :output
-		     :if-does-not-exist :create
-		     :if-exists :append 
-		     #+(or) (if reset-log? :supersede :append)))
-	      (t (error "don't know how to log to ~a" location)))))
 
 (defmethod close-sender ((sender stream-sender-mixin))
   (when (close-stream? sender)
