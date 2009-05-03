@@ -29,6 +29,9 @@ Nice to have undefcategory or the like
 	   #:pop-context
 	   #:push-context
 	   #:with-context
+	   #:push-indent
+	   #:pop-indent
+	   #:with-indent
 	   #:with-context-for
 	   #:defoutput			;
 	   ;; manager
@@ -112,7 +115,8 @@ Nice to have undefcategory or the like
   ignore-errors?
   compile-category-spec
   expanded-compile-category-spec
-  debug-console)
+  debug-console
+  indents)
 
 (defvar *log-manager* nil)
 
@@ -410,6 +414,14 @@ static but the process id of the current Lisp is)."
     result))
 
 (defoutput time (get-universal-time))
+
+(defoutput indent (make-indent-space))
+
+;;?? FIXME - cache this
+(defun make-indent-space ()
+  (make-string 
+   (loop for (indent . nil) in (log5-indents (log-manager)) sum (or indent 0))
+   :initial-element #\Space))
 
 ;;?? find duplicates
 (defmacro start-sender (name (sender-type &rest args) &key 
@@ -742,7 +754,7 @@ should descend."))
   (:default-initargs
    :location *debug-io*
     :name 'debug-console
-    :output-spec '(message)
+    :output-spec '(indent message)
     :category-spec nil))
 
 (defun find-or-create-debug-console ()
@@ -827,6 +839,31 @@ should descend."))
       `(when ,predicate 
 	(log-for ,category-spec ,message ,@args))
       `(values)))
+
+
+;;;;; indentation
+
+(defun pop-indent ()
+  (pop (log5-indents (log-manager))))
+
+(defun push-indent (amount &rest args &key &allow-other-keys)
+  (push (cons amount args) (log5-indents (log-manager))))
+
+#+(or)
+;; WIP
+(defmacro with-indent ((amount &rest args &key &allow-other-keys) &body body)
+  `(unwind-protect
+	(progn (push-indent ,amount ,@args)
+	       ,@body)
+     (pop-indent)))
+
+(defmacro with-indent ((amount &rest args &key &allow-other-keys) &body body)
+  (declare (ignorable amount args))
+  `(progn ,@body))
+
+#+(or)
+(log5:with-indent (5)
+  (log-for (dribble+ reasoner) "OK"))
 
 
 ;;;;; context
