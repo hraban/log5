@@ -187,10 +187,12 @@ Nice to have undefcategory or the like
 
 ;;?? see above, merge / refactor
 (defun active-category-p (id)
-  (some (lambda (sender)
-	  (update-active-categories sender id)
-	  (= (sbit (active-categories sender) id) 1))
-	(log5-senders (log-manager))))
+  (flet ((active? (sender)
+	   (update-active-categories sender id)
+	   (= (sbit (active-categories sender) id) 1)))
+    (declare (dynamic-extent (function active?)))
+    (or (active? (log5-debug-console (log-manager)))
+	(some #'active? (log5-senders (log-manager))))))
 	
 (defun configuration-file (&key (name "logging") (type "config")
 			   (prefer-current-directory-p t))
