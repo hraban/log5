@@ -1,0 +1,170 @@
+How do we connect a log message to a sender? Via the category-spec.
+
+So given a message with spec X and a sender with spec Y, how do we 
+know to send it? 
+
+What is a way? The question is "is there a sender that sends this category
+of message?" The sender has a category spec (some boolean combination
+of simple categories). The message asserts a category spec. I.e.,
+the spec in log-for is always interpretted as an :and spec. This this
+message is in A and B and C. How bad would this be? 
+
+	log-if (spec filter)
+	log-for spec ...
+
+I think it's ok. So a way would be to assert the categories and then 
+evaluate the log spec. progv? yes. (10-20x slower than destructuring-bind)
+but ok for a prototype
+
+So a sender has a spec and we want to do some thing like
+
+(progv (spec-vars (spec-of sender))
+       X
+       (progv (spec-vars (spec-of message))
+              (all T)
+	      ))
+
+hmmm
+
+;;; can we do it fast later?
+
+my hope was to use bit vectors somehow
+
+A program will have a finite set of log statements, at compile time, I can
+assign each (unique one) a number (as they are found during compile). Given
+a sender, I can evaluate each possible index when the sender is created. 
+
+Hmmm, this sounds easier than the progv method. BUT, what does it mean to 
+"evaluate"?
+
+(sender '(or error warn) ...)
+(log-for '(and a b c) ...)
+
+Are these boolean features good or bad??
+
+If log statements are always logical ands and senders can be anything
+
+;;;;
+
+properties
+
+create functions at run time... to stream out properties (stream?)
+
+;;;;;
+
+need terminators
+
+;;;;;
+
+log5 -- not a bad name
+
+- (log-if <predicate>  ...)
+- (log-for category ...)
+? (log-class class ...)
+
+log-errors
+
+tee command
+  add-log / remove-log / logs
+
+(log-categories)
+(setf (log-categories) ...)
+(log-classes)
+(setf (log-classes) ...)
+
+log rolling policies
+
+NDC (nested diagnostic context (sheesh!)).
+
+each sender should have it's own level and categories? (filter)
+logger == category (ies)
+appenders per logger or global?
+saving stack
+
+motivation!?
+
+(log.error logger ...)
+(log.debug logger ...)
+
+find . -name "*.lisp"  -and -not -path "*/_darcs/*"  -and -not -path "*/tags/*"   -exec grep -iq "deflogger" {} \; -print
+
+./cl-wdim/meta-model/package.lisp
+./cl-wdim/presentation/loggers.lisp
+./cl-wdim/test/presentation/package.lisp
+find: ./metabang-bind/_darcs/current/unit-tests: Permission denied
+find: ./metabang-bind/unit-tests: Permission denied
+./pmpe/package.lisp
+./ucw/src/backend/araneida.lisp
+./ucw/src/loggers.lisp
+
+level == importance(?), severity
+  all, failure, error, warn, debug, info, dribble, ...
+  (mixing of semantics)
+
+custom levels?
+
+fatal - Severe errors that cause premature termination. Expect these to be immediately visible on a status console. See also Internationalization.
+error - Other runtime errors or unexpected conditions. Expect these to be immediately visible on a status console. See also Internationalization.
+warn - Use of deprecated APIs, poor use of API, 'almost' errors, other runtime situations that are undesirable or unexpected, but not necessarily "wrong". Expect these to be immediately visible on a status console. See also Internationalization.
+info - Interesting runtime events (startup/shutdown). Expect these to be immediately visible on a console, so be conservative and keep to a minimum. See also Internationalization.
+debug - detailed information on the flow through the system. Expect these to be written to logs only.
+trace - more detailed information. Expect these to be written to logs only.
+
+loggers == categories (where in the system)
+
+appenders == ways to output a message (senders, outputers, handlers, writers)
+
+add to loggers
+
+- Arnesi pollutes function name space
+
+(log.error <category> or  <class> "message" args)
+log.warn
+log.<your-level-here>
+
+(log-if.error <predicate> ...)
+(log-for.warn (category+) ...)
+(log.info ...)
+
+(log-if predicate ...)
+(log-if (:error predicate) ...)
+(log-message ...)
+(log-message :level ...)
+
+:task-manager
+:task
+:index
+:merge
+
+(like #+ / #-)
+(log-for (:or :task :index) ...)
+(log-for (:and ...) ...)
+
+(defcategory index-task (:and :index :task))
+(log-for index-task ...)
+
+categories organize logging message creation
+  are levels == categories? or separate? or the same but separate anyway
+
+senders organize logging message output
+  start-logging name (categories*) method method args) 
+  stop-logging name
+
+  console, file, web, db, ...
+  rollover policy?
+
+  
+formatters organize logging message display?
+
+(log-for (:and :task :error) ...)
+(log-for.error :task ...)
+
+(log-for (:error :task) 
+
+memoize when a category spec is action (only need update when
+  log-categories changes
+
+memoize which senders belong to which categories
+
+|#
+

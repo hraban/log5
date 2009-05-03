@@ -1,0 +1,13 @@
+### Log5 - it may not be better, but it is one more
+
+Log5 is organized around:
+
+* Categories
+* Properties
+* a Context stack
+* Senders
+
+Categories organize log entries; properties control what gets written;
+the context helps separate the forest from the trees; and senders take
+care of _sending_ log messages to the right place(s).
+

@@ -1,0 +1,29 @@
+Sounds promising. What I’d like to see in a logging library is making promises at compile time about the categories (akin to type declarations) to allow completely removing logging from from the code.
+
+Example, if PHYSICS and FILE-SYSTEM are both promised to be always on then (and physics (not file-system) trace) is guaranteed to be false and log-for can be removed.
+
+(Gábor Melis)
+
+Something like this work goes a long way to being able to get standard output from different bits of code without having to go in and modify all the places where logging is done. Effectively, you want a frame work where the code can say “log this” and the logging system can be reconfigured outside the code itself to do the right thing.
+
+(Dave Roberts)
+
+Currently I’m using log4cl. and this:
+
+(log-debug file-logger 
+   (when (equal (log4cl::logger-level file-logger) :debug)
+      (filename-as-link (save-to-new-file page log-directory “page” “html”))))
+
+This writes page to a new file (e.g. page0001.html) and enters a link to this file into the log file.
+
+I believe easy access to data which does not fit into the log file format is a helpful feature.
+
+For selecting the desired appenders for different levels I thought a switchboard or matrix as shown below could be sufficient and can be easily maintained:
+
+('(     terminal-io :file :email)
+‘(:log             ff      n    ff)
+‘(:warn            n       n    ff)
+‘(:error           n       n    n)
+‘(:debug           n       n    ff))
+I’m waiting for log5.
+
