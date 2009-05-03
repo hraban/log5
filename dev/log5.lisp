@@ -157,19 +157,20 @@ Nice to have undefcategory or the like
        (labels ((,gforce-output ()
 		  (or ,goutput 
 		      (setf ,goutput
-			    (let ((*print-pretty* nil))
-			      ,(if args 
-				   `(format nil ,message ,@args) message)))))
+			    ,(if args 
+				 `(format nil ,message ,@args) message))))
 		(handle-message-for-sender (sender)
 		  (update-active-categories sender ,gid)
 		  (when (= (sbit (active-categories sender) ,gid) 1)
 		    (funcall (handle-message-fn sender) 
 			     ,gid sender (,gforce-output)))))
 	 ;; maybe 'map-senders'
-	 (dolist (sender (log5-senders ,gmanager))
-	   (handle-message-for-sender sender))
-	 (when ,gconsole
-	   (handle-message-for-sender ,gconsole))
+	 (let ((*print-pretty* nil))
+	   (dolist (sender (log5-senders ,gmanager))
+	     (handle-message-for-sender sender)))
+	 (let ((*print-pretty* t))
+	   (when ,gconsole
+	     (handle-message-for-sender ,gconsole)))
 	 ,goutput))))
 
 #+(or)
