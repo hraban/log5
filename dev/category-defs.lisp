@@ -2,7 +2,7 @@
 
 #|
 
-this 'need' to be in their own file due to changes 
+these 'need' to be in their own file due to changes 
 to support compile-time category filtering
 
 |#
