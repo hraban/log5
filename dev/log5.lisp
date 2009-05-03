@@ -612,6 +612,11 @@ should descend."))
 	       ,sender-spec))))))))
 
 (defun compile-handle-message-fn (fn)
+  #+allegro
+  (if excl::*compiler-not-available*
+      (coerce fn 'function)
+      (compile nil fn))
+  #-allegro
   (compile nil fn))
   
 (defun build-handle-message-fn (sender)
