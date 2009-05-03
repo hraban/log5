@@ -905,7 +905,7 @@ should descend."))
                     (nconc (rec (car list)) (rec (cdr list))))
                    (t               
                     (mapcan #'rec list)))))
-    (declare (dynamic-extent rec))
+    (declare (dynamic-extent (function rec)))
     (if (atom list)
       list
       (rec list))))
