@@ -650,8 +650,8 @@ should descend."))
   (declare (ignore sender)))
 
 (defclass stream-sender-mixin (basic-sender)
-  ((output-stream :reader output-stream)
-   (close-stream? :reader close-stream?)
+  ((output-stream :reader output-stream :initform nil)
+   (close-stream? :reader close-stream? :initform nil)
    (location :initarg :location :reader location)))
 
 
@@ -659,7 +659,7 @@ should descend."))
   `((stream (make-string-output-stream))))
 
 (defmethod start-handling ((sender stream-sender-mixin)) 
-  `())
+  `((ensure-stream-open sender)))
 
 (defmethod finish-handling ((sender stream-sender-mixin))
   `((let ((output (output-stream sender)))
@@ -729,6 +729,20 @@ should descend."))
 	     `(princ ,(output-form output) stream)))
 	(t
 	 (error "don't know how to handle ~a" output))))
+
+(defun ensure-stream-open (stream-sender)
+  (or (output-stream stream-sender)
+      (let ((location (location stream-sender)))
+	(setf (slot-value stream-sender 'close-stream?) (not (streamp location))
+	      (slot-value stream-sender 'output-stream)
+	      (cond ((streamp location) location)
+		    ((or (pathnamep location) (stringp location))
+		     (ensure-directories-exist location)
+		     (open location :direction :output
+			   :if-does-not-exist :create
+			   :if-exists :append 
+			   #+(or) (if reset-log? :supersede :append)))
+		    (t (error "don't know how to log to ~a" location)))))))
 
 (defmethod initialize-instance :after ((object stream-sender-mixin) 
 				       &key location)
