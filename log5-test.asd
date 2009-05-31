@@ -15,7 +15,8 @@
     "setup"
     :pathname "unit-tests/"
     :components ((:file "package")
-		 (:file "definitions" :depends-on ("package"))))
+		 (:file "definitions" :depends-on ("package"))
+		 (:file "utilities" :depends-on ("package"))))
    (:module 
     "unit-tests"
     :depends-on ("setup")

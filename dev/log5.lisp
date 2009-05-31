@@ -55,8 +55,8 @@ Nice to have undefcategory or the like
 	   #:close-stream?
 	   #:output-stream
 	   #:name
-	   #:debug-category-spec
-	   #:undebug-category-spec
+	   #:debugging
+	   #:undebugging
 	   ;; standard 'levels'
 	   #:fatal #:error #:warn #:info #:trace #:dribble
 	   #:error+ #:warn+ #:info+ #:trace+ #:dribble+
@@ -140,7 +140,7 @@ Nice to have undefcategory or the like
   (log5-ignore-errors? (log-manager)))
 
 (defun (setf ignore-errors-p) (value)
-  "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugging. This is setfable."
+  "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugger. This is setfable."
   (setf (log5-ignore-errors? (log-manager)) (not (null value))))
 
 (defmacro handle-message (id message &rest args)
@@ -191,7 +191,7 @@ Nice to have undefcategory or the like
 	   (update-active-categories sender id)
 	   (= (sbit (active-categories sender) id) 1)))
     (declare (dynamic-extent (function active?)))
-    (or (active? (log5-debug-console (log-manager)))
+    (or (and (log5-debug-console (log-manager)) (active? (log5-debug-console (log-manager))))
 	(some #'active? (log5-senders (log-manager))))))
 	
 (defun configuration-file (&key (name "logging") (type "config")
@@ -598,15 +598,16 @@ should descend."))
    sb-ext:without-package-locks
    #-sbcl
    progn
-   (multiple-value-bind (sender-postivies sender-negatives)
+   (multiple-value-bind (sender-positive sender-negatives)
        (determine-category-variables sender-spec)
      (let* ((cat-positive (category-variables category))
 	    (cat-negative (category-negated-variables category))
-	    (sender-variables (nconc sender-postivies sender-negatives))
+	    (sender-variables (nconc sender-positive sender-negatives))
 	    (sender-free (remove-if (lambda (x)
 				      (or (member x cat-positive)
 					  (member x cat-negative)))
 				    sender-variables)))
+;       (print (list cat-positive cat-negative sender-free))
        (eval
 	`(%with-vars ,cat-positive t
 	   (%with-vars ,cat-negative nil
@@ -765,42 +766,53 @@ should descend."))
   (:default-initargs
    :location *debug-io*
     :name 'debug-console
-    :output-spec '(indent message)
+    :output-spec nil
     :category-spec nil))
 
-(defun find-or-create-debug-console ()
-  (or (log5-debug-console (log-manager))
-      (setf (log5-debug-console (log-manager))
-	    (make-instance 'debug-console-sender))))
+(defun find-or-create-debug-console (&optional (output-spec '(indent message) supplied?))
+  (flet ((make-new ()
+	   (setf (log5-debug-console (log-manager))
+		 (make-instance 'debug-console-sender :output-spec output-spec))))
+    (let ((result (or (log5-debug-console (log-manager)) (make-new))))
+      (when (and supplied? (not (equal (output-spec result) output-spec)))
+	(setf result (make-new)))
+      result)))
 
-(defun debug-category-spec (&optional category-spec &key output-spec reset?) 
-  (declare (ignore output-spec))
-  (let ((console (find-or-create-debug-console)))
-    (when reset?
-      (setf (specs console) nil))
-    (cond (category-spec
-	   (let ((current-specs (specs console)))
-	     (handler-case
-		 (progn
-		   (setf (specs console) 
-			 (cond ((specs console)
-				(if (find category-spec (specs console)
-					  :test #'equal)
-				    (specs console)
-				    `(,@(specs console) ,category-spec)))
-			       (t
-				`(or ,category-spec)))
-			 (slot-value console 'category-spec) (specs console))
-		   (initialize-category-spec console))
-	       (error (c)
-		 ;(declare (ignore c))
-		 (setf (specs console) current-specs)
-		 (error c))))
-	   (specs console))
-	  (t
-	   (specs console)))))
+(defun debugging (&optional category-spec &key 
+			    (output-spec nil supplied?) reset?) 
+  (let ((output-spec (when output-spec
+		       (if (consp output-spec) 
+			   output-spec (list output-spec)))))
+    (unless (find 'message output-spec)
+      (setf output-spec (append output-spec '(message))))
+    (let ((console (if supplied? 
+		       (find-or-create-debug-console output-spec)
+		       (find-or-create-debug-console))))
+      (when reset?
+	(setf (specs console) nil))
+      (cond (category-spec
+	     (let ((current-specs (specs console)))
+	       (handler-case
+		   (progn
+		     (setf (specs console) 
+			   (cond ((specs console)
+				  (if (find category-spec (specs console)
+					    :test #'equal)
+				      (specs console)
+				      `(,@(specs console) ,category-spec)))
+				 (t
+				  `(or ,category-spec)))
+			   (slot-value console 'category-spec) (specs console))
+		     (initialize-category-spec console))
+		 (error (c)
+					;(declare (ignore c))
+		   (setf (specs console) current-specs)
+		   (error c))))
+	     (specs console))
+	    (t
+	     (specs console))))))
 
-(defun undebug-category-spec (&optional category-spec)
+(defun undebugging (&optional category-spec)
   (let ((console (find-or-create-debug-console)))
     (cond (category-spec
 	   (setf (specs console) 
@@ -809,7 +821,7 @@ should descend."))
 	   (setf (specs console) nil)))
     (setf (slot-value console 'category-spec) (specs console))
     (initialize-category-spec console)
-    console))
+    console))  
   
 ;;;;; messages 
 

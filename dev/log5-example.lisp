@@ -82,3 +82,21 @@ SELECT ?x ?name ?email ?telephone WHERE
 		(full-context)
 		(stack-trace)))
 |#
+
+(defun run-program ()
+  (log-for info "enter run")
+  (step-1)
+  (log-for info "exit run"))
+
+(defun step-1 ()
+  (log-for trace "enter step-1")
+  (sub-step-1)
+  (log-for trace "exit step-1"))
+
+(defun sub-step-1 ()
+  (log-for dribble "enter sub-step-1")
+  (log-for dribble "exit sub-step-1"))
+
+(debugging 'info+ :reset? t)
+
+(run-program)
