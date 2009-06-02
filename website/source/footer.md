@@ -1,7 +1,7 @@
 <div id="footer">
 {include navigation.md}
 
-### Copyright (c) 2007 Gary Warren King (gwking@metabang.com) 
+### Copyright (c) 2007 - 2009 Gary Warren King (gwking@metabang.com) 
 
 Log5 has an [MIT style][mit-license] license
 

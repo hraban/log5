@@ -33,8 +33,7 @@
 	   ;; not supported
 	   (log-for (not (not (nc-foo (not nc-bar)))) "yes")
 	   )))
-    (print string)
-    (ensure-same string (format nil "\"absence is negation?\"~&\"yes\"")
+    (ensure-same string (format nil "absence is negation?~&yes")
 		 :test 'string=)))
 
 

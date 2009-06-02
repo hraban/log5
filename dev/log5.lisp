@@ -143,6 +143,7 @@ Nice to have undefcategory or the like
   "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugger. This is setfable."
   (setf (log5-ignore-errors? (log-manager)) (not (null value))))
 
+#+(or)
 (defmacro handle-message (id message &rest args)
   ;; needs to be a macro to delay evaluation of args...
   (let ((gid (gensym)) 
@@ -173,25 +174,39 @@ Nice to have undefcategory or the like
 	     (handle-message-for-sender ,gconsole)))
 	 ,goutput))))
 
-#+(or)
-(defun handle-message-for-sender (sender id message args output)
-  (update-active-categories sender id)
-  (when (= (sbit (active-categories sender) id) 1)
-    (funcall (handle-message-fn sender) id sender
-	     (or output
-		 (setf output
-		       (let ((*print-pretty* nil))
-			 (if args 
-			     (apply #'format nil message args) message)))))
-    output))
+(defmacro handle-message (id message &rest args)
+  `(%handle-message ,id ,message ,@args))
 
-;;?? see above, merge / refactor
+(defun %handle-message (id message &rest args)
+  (let* ((outputs (make-hash-table :test #'eq))
+	 (manager (log-manager))
+	 (console (log5-debug-console manager)))
+    (labels ((find-or-create-output (sender)
+	       (or (gethash (message-creator-class sender) outputs) 
+		   (setf (gethash (message-creator-class sender) outputs) 
+			 (create-message-for-sender sender message args))))
+	     (handle-message-for-sender (sender)
+	       (update-active-categories sender id)
+	       (when (= (sbit (active-categories sender) id) 1)
+		 (funcall (handle-message-fn sender) 
+			  id sender (find-or-create-output sender)))))
+      (declare (dynamic-extent (function find-or-create-output 
+					 handle-message-for-sender)))
+      ;; maybe 'map-senders'
+      (let ((*print-pretty* nil))
+	(dolist (sender (log5-senders manager))
+	  (handle-message-for-sender sender)))
+      (when console
+	(let ((*print-pretty* nil))
+	  (handle-message-for-sender console))))))
+
 (defun active-category-p (id)
   (flet ((active? (sender)
 	   (update-active-categories sender id)
 	   (= (sbit (active-categories sender) id) 1)))
     (declare (dynamic-extent (function active?)))
-    (or (and (log5-debug-console (log-manager)) (active? (log5-debug-console (log-manager))))
+    (or (and (log5-debug-console (log-manager))
+	     (active? (log5-debug-console (log-manager))))
 	(some #'active? (log5-senders (log-manager))))))
 	
 (defun configuration-file (&key (name "logging") (type "config")
@@ -365,8 +380,13 @@ Specifically, a simple category is just a name whereas a complex category is a b
 
 (defvar *output-specs* (make-hash-table :test #'eq))
 
+(defun reset-output-specs! ()
+  "Remove all output-specs; In general, it's not a good idea to use
+this but it can be handy if you need a clean slate."
+  (setf *output-specs* (make-hash-table :test #'eq)))
+
 (defstruct (log-output (:conc-name output-))
-  name form (format "~s") static?)
+  name form (format "~a") static?)
 
 (defmacro defoutput (name form &key format static?)
   "Define an output specification: a link between a `name` and a `form` that will be called during logging to put something in the log file. 
@@ -509,6 +529,8 @@ set to nil."
    (name :reader name :initarg :name)
    (output-spec :initarg :output-spec :reader output-spec)
    (handle-message-fn :reader handle-message-fn)
+   (message-creator :reader message-creator :initargs 'basic-message-creator
+		    :writer %set-message-creator)
    (active-categories :reader active-categories
 		      :initform (make-category-array 0)))
   (:documentation "The root sender class from which all senders ~
@@ -524,11 +546,37 @@ should descend."))
 (defmethod print-sender ((sender basic-sender) stream)
   (format stream "~a" (name sender)))
 
-(defmethod initialize-instance :after ((object basic-sender) &key 
-				       )
+(defmethod initialize-instance 
+    :after ((object basic-sender) &key 
+	    message-creator (message-creator-class 'basic-message-creator))
   (setf (slot-value object 'handle-message-fn)
 	(compile-handle-message-fn 
-	 (build-handle-message-fn object))))
+	 (build-handle-message-fn object)))
+  (%set-message-creator (or message-creator
+			    (make-instance message-creator-class))
+			object))
+
+;;;;
+
+(defgeneric create-message-for-sender (message-creator message args)
+  )
+
+(defclass basic-message-creator ()
+  ())
+
+(defmethod create-message-for-sender ((sender basic-sender) message args)
+  (create-message-for-sender (message-creator sender) message args))
+
+(defmethod create-message-for-sender ((creator basic-message-creator) 
+				      message args)
+  (if args
+      (apply #'format message args)
+      message))
+
+(defun message-creator-class (sender)
+  (class-of (message-creator sender)))
+
+;;;;
 
 (defclass sender-with-categories (basic-sender)
   ((category-spec :initarg :category-spec :reader category-spec)
@@ -678,6 +726,7 @@ should descend."))
 	  (file-position output :end))
 	(fresh-line output)
 	(princ (get-output-stream-string stream) output) 
+	;;(terpri output)
 	(force-output output)))))
 
 #|
@@ -698,21 +747,19 @@ should descend."))
 
 (defmethod handle-output ((sender stream-sender-mixin) output)
   (cond ((eq output 'message)
-	 `(progn (princ #\" stream) (princ message stream) (princ #\" stream)))
+	 `(progn (princ message stream)))
 	((eq output 'category)
 	 `(progn 
-	    (princ #\" stream) 
 	    (let ((category (id->category category-id)))
 	      (if category
 		  (princ (category-specification category) stream)
-		  (format stream "\"category ~d not found\"" category-id)))
-	    (princ #\" stream)))
+		  (format stream "\"category ~d not found\"" category-id)))))
 	((eq output 'context)
 	 `(princ (log5-context (log-manager)) stream))
 	((eq output 'first-context)
 	 `(princ (first (log5-context (log-manager))) stream))
 	((stringp output)
-	 `(progn (princ #\" stream) (princ ,output stream) (princ #\" stream)))
+	 `(progn (princ ,output stream)))
 	((typep output 'log-output)
 	 (if (output-format output)
 	     `(format stream ,(output-format output) ,(output-form output))
@@ -769,10 +816,12 @@ should descend."))
     :output-spec nil
     :category-spec nil))
 
-(defun find-or-create-debug-console (&optional (output-spec '(indent message) supplied?))
+(defun find-or-create-debug-console
+    (&optional (output-spec '(indent message) supplied?))
   (flet ((make-new ()
 	   (setf (log5-debug-console (log-manager))
-		 (make-instance 'debug-console-sender :output-spec output-spec))))
+		 (make-instance 'debug-console-sender
+				:output-spec output-spec))))
     (let ((result (or (log5-debug-console (log-manager)) (make-new))))
       (when (and supplied? (not (equal (output-spec result) output-spec)))
 	(setf result (make-new)))

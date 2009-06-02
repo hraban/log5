@@ -36,7 +36,7 @@
   (log-for warn "nothing")
   (ensure-same 
    (get-output-stream-string string-stream) 
-   (format nil "\"test\" \"~a\" \"nothing\"" 'warn)))
+   (format nil "test ~a nothing" 'warn)))
 
 (deftestsuite test-category-combinations (log5-test)
   ()

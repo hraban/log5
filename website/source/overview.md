@@ -3,7 +3,7 @@
 
 ## Overview 
 
-{table-of-contents :start 2 :depth 3}
+{table-of-contents :start 3 :depth 3}
 
 ### Categories, senders and messages, oh my!
 
