@@ -1,6 +1,9 @@
 (in-package #:log5-test)
 
-(setf (log5:compile-category-spec) nil)
+(eval-when (:compile-toplevel)
+  (declaim (optimize (speed 3) (safety 1))))
+
+;(setf (log5:compile-category-spec) 'info+)
 
 (defcategory log5-speed-test)
 
@@ -62,6 +65,33 @@
 (prof:with-profiling (:type :time) 
   (benchmark-with-senders 0 20 1000000 (list 10)))
 (prof:show-flat-profile)
+
+
+(benchmark-with-senders 0 20 1000000 (list 10))
+((10 1000000 46.441d0 850100552 (0 20)))
+
+(prof:with-profiling (:type :time) 
+  (benchmark-with-senders 1 19 10000 (list 10)))
+
+(benchmark-with-senders 0 20 10000 (list 10))
+
+(benchmark-with-senders 0 20 1 (list 10))
+
+(benchmark-with-senders 1 19 1 (list 10))
+(benchmark-with-senders 2 18 10000 (list 10))
+
+(defun foo ()
+  "ro")
+
+
+(log5:log-manager)
+
+(log5:log-for (info log5-speed-test) "hi")
+
+(log5:log-for (info log5-speed-test) "hi ~a" (foo))
+
+(trace foo)
+(foo)
 |#
 
 #|

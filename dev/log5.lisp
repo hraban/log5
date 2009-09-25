@@ -175,16 +175,18 @@ Nice to have undefcategory or the like
 	 ,goutput))))
 
 (defmacro handle-message (id message &rest args)
-  `(%handle-message ,id ,message ,@args))
+  `(%handle-message ,id ,message (lambda () '(,@args))))
 
-(defun %handle-message (id message &rest args)
+;;?? use an alist, not a hash-table
+(defun %handle-message (id message arg-thunk)
   (let* ((outputs (make-hash-table :test #'eq))
 	 (manager (log-manager))
 	 (console (log5-debug-console manager)))
     (labels ((find-or-create-output (sender)
-	       (or (gethash (message-creator-class sender) outputs) 
-		   (setf (gethash (message-creator-class sender) outputs) 
-			 (create-message-for-sender sender message args))))
+	       (or (gethash (message-creator-class sender) outputs)
+		   (setf (gethash (message-creator-class sender) outputs)
+			 (create-message-for-sender 
+			  sender message (funcall arg-thunk)))))
 	     (handle-message-for-sender (sender)
 	       (update-active-categories sender id)
 	       (when (= (sbit (active-categories sender) id) 1)
@@ -195,9 +197,8 @@ Nice to have undefcategory or the like
       ;; maybe 'map-senders'
       (let ((*print-pretty* nil))
 	(dolist (sender (log5-senders manager))
-	  (handle-message-for-sender sender)))
-      (when console
-	(let ((*print-pretty* nil))
+	  (handle-message-for-sender sender))
+	(when console
 	  (handle-message-for-sender console))))))
 
 (defun active-category-p (id)
@@ -570,7 +571,7 @@ should descend."))
 (defmethod create-message-for-sender ((creator basic-message-creator) 
 				      message args)
   (if args
-      (apply #'format message args)
+      (apply #'format nil message args)
       message))
 
 (defun message-creator-class (sender)
@@ -726,7 +727,7 @@ should descend."))
 	  (file-position output :end))
 	(fresh-line output)
 	(princ (get-output-stream-string stream) output) 
-	;;(terpri output)
+	(terpri output)
 	(force-output output)))))
 
 #|
@@ -817,7 +818,7 @@ should descend."))
     :category-spec nil))
 
 (defun find-or-create-debug-console
-    (&optional (output-spec '(indent message) supplied?))
+    (&optional (output-spec '(message) supplied?))
   (flet ((make-new ()
 	   (setf (log5-debug-console (log-manager))
 		 (make-instance 'debug-console-sender
@@ -828,7 +829,7 @@ should descend."))
       result)))
 
 (defun debugging (&optional category-spec &key 
-			    (output-spec nil supplied?) reset?) 
+		  (output-spec nil supplied?) reset?) 
   (let ((output-spec (when output-spec
 		       (if (consp output-spec) 
 			   output-spec (list output-spec)))))
@@ -838,28 +839,27 @@ should descend."))
 		       (find-or-create-debug-console output-spec)
 		       (find-or-create-debug-console))))
       (when reset?
-	(setf (specs console) nil))
-      (cond (category-spec
-	     (let ((current-specs (specs console)))
-	       (handler-case
-		   (progn
-		     (setf (specs console) 
-			   (cond ((specs console)
-				  (if (find category-spec (specs console)
-					    :test #'equal)
-				      (specs console)
-				      `(,@(specs console) ,category-spec)))
-				 (t
-				  `(or ,category-spec)))
-			   (slot-value console 'category-spec) (specs console))
-		     (initialize-category-spec console))
-		 (error (c)
+	(setf (specs console) nil
+	      (slot-value console 'category-spec) nil))
+      (when category-spec
+	(let ((current-specs (specs console)))
+	  (handler-case
+	      (progn
+		(setf (specs console) 
+		      (cond ((specs console)
+			     (if (find category-spec (specs console)
+				       :test #'equal)
+				 (specs console)
+				 `(,@(specs console) ,category-spec)))
+			    (t
+			     `(or ,category-spec)))
+		      (slot-value console 'category-spec) (specs console)))
+	    (error (c)
 					;(declare (ignore c))
-		   (setf (specs console) current-specs)
-		   (error c))))
-	     (specs console))
-	    (t
-	     (specs console))))))
+	      (setf (specs console) current-specs)
+	      (error c)))))
+      (initialize-category-spec console)
+      (specs console))))
 
 (defun undebugging (&optional category-spec)
   (let ((console (find-or-create-debug-console)))

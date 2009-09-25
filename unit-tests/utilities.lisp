@@ -15,6 +15,15 @@
 	 (stop-sender-fn ,gsender-name :warn-if-not-found-p nil))
        (get-output-stream-string ,gstream))))
 
+(defmacro with-debugging-captured-to-string (category-spec &body body)
+  `(let ((*debug-io* (make-string-output-stream)))
+     (unwind-protect
+	  (progn
+	    (debugging ',category-spec)
+	    ,@body)
+       (undebugging ',category-spec))
+     (get-output-stream-string *debug-io*)))
+
 (defparameter +whitespace-characters+
   (list #\Space #\Newline #\Tab #\Page #\Null #\Linefeed)
   "A list of characters that should be treated as whitespace. See, 

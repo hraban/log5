@@ -36,7 +36,7 @@
   (log-for warn "nothing")
   (ensure-same 
    (get-output-stream-string string-stream) 
-   (format nil "test ~a nothing" 'warn)))
+   (format nil "test ~a nothing~%" 'warn)))
 
 (deftestsuite test-category-combinations (log5-test)
   ()
@@ -124,3 +124,73 @@
       ))
    "A"))
     
+;;;;
+
+(deftestsuite test-message-formatting (log5-test)
+  ()
+  (:equality-test #'string=))
+
+(addtest (test-message-formatting)
+  simple-message
+  (ensure-same 
+   (with-logging-captured-to-string (info)
+     (log-for info "hello there"))
+   "hello there
+"))
+
+(addtest (test-message-formatting)
+  formatted-string-with-arguments
+  (ensure-same 
+   (with-logging-captured-to-string (info)
+     (log-for info "hello there ~a" "gary"))
+   "hello there gary
+"))
+
+(addtest (test-message-formatting)
+  formatted-string-with-tilde-and-arguments
+  (ensure-same 
+   (with-logging-captured-to-string (info)
+     (log-for info "hello there ~a. ~
+how are you?" "gary"))
+   "hello there gary. how are you?
+"))
+
+(addtest (test-message-formatting)
+  formatted-string-with-tilde
+  (ensure-same 
+   (with-logging-captured-to-string (info)
+     (log-for info "hello there, ~
+how are you?"))
+   "hello there, how are you?
+"))
+
+;;;
+
+#|
+(deftestsuite test-debugging (log5-test)
+  ()
+  (:equality-test #'string=))
+
+  
+
+(addtest (test-debugging)
+  captures
+  (ensure-same 
+   (with-debugging-captured-to-string (info)
+     (log-for info "ji"))
+
+(let ((*debug-io* (make-string-output-stream)))
+  (format *debug-io* "he")
+  (get-output-stream-string *debug-io*))
+
+(debugging '(info) :reset? t)
+
+(log-for info "ji")
+
+(debugging nil :reset? t )
+
+(debugging 
+
+|#
+
+;;;
