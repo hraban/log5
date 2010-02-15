@@ -143,50 +143,20 @@ Nice to have undefcategory or the like
   "If true, then log5 will ignore any errors that occur during logging actions. If false, log5 will enter the debugger. This is setfable."
   (setf (log5-ignore-errors? (log-manager)) (not (null value))))
 
-#+(or)
-(defmacro handle-message (id message &rest args)
-  ;; needs to be a macro to delay evaluation of args...
-  (let ((gid (gensym)) 
-	(goutput (gensym))
-	(gconsole (gensym))
-	(gmanager (gensym))
-	(gforce-output (gensym)))
-    `(let* ((,goutput nil)
-	    (,gid ,id)
-	    (,gmanager (log-manager))
-	    (,gconsole (log5-debug-console ,gmanager)))
-       (labels ((,gforce-output ()
-		  (or ,goutput 
-		      (setf ,goutput
-			    ,(if args 
-				 `(format nil ,message ,@args) message))))
-		(handle-message-for-sender (sender)
-		  (update-active-categories sender ,gid)
-		  (when (= (sbit (active-categories sender) ,gid) 1)
-		    (funcall (handle-message-fn sender) 
-			     ,gid sender (,gforce-output)))))
-	 ;; maybe 'map-senders'
-	 (let ((*print-pretty* nil))
-	   (dolist (sender (log5-senders ,gmanager))
-	     (handle-message-for-sender sender)))
-	 (let ((*print-pretty* t))
-	   (when ,gconsole
-	     (handle-message-for-sender ,gconsole)))
-	 ,goutput))))
-
 (defmacro handle-message (id message &rest args)
   `(%handle-message ,id ,message (lambda () '(,@args))))
 
-;;?? use an alist, not a hash-table
 (defun %handle-message (id message arg-thunk)
-  (let* ((outputs (make-hash-table :test #'eq))
+  (let* ((outputs nil)
 	 (manager (log-manager))
 	 (console (log5-debug-console manager)))
     (labels ((find-or-create-output (sender)
-	       (or (gethash (message-creator-class sender) outputs)
-		   (setf (gethash (message-creator-class sender) outputs)
-			 (create-message-for-sender 
-			  sender message (funcall arg-thunk)))))
+	       (or (cdr (assoc (message-creator-class sender) outputs))
+		   (let ((result (create-message-for-sender 
+				  sender message (funcall arg-thunk)))) 
+		     (push (cons (message-creator-class sender) result)
+			   outputs)
+		     result)))
 	     (handle-message-for-sender (sender)
 	       (update-active-categories sender id)
 	       (when (= (sbit (active-categories sender) id) 1)
@@ -210,26 +180,6 @@ Nice to have undefcategory or the like
 	     (active? (log5-debug-console (log-manager))))
 	(some #'active? (log5-senders (log-manager))))))
 	
-(defun configuration-file (&key (name "logging") (type "config")
-			   (prefer-current-directory-p t))
-  "Returns the path to the standard log5 configuration file. This is used by `configure-from-file` to setup logging activitiy. `Configuration-file looks in the 
-user's home directory (using `user-homedir-pathname`) and the directory specified by `*default-pathname-defaults*`. The default is to use a file named \"logging.config\" but you can use the `:name` and `:type` parameters to customize this. If files exist in both directories, the `configuration-file` will use the one in the home directory unless `:prefer-current-directory-p` is true."
-  (let ((current-file (probe-file
-		       (make-pathname 
-			:name name
-			:type type)))
-        (home-file (probe-file 
-		    (make-pathname
-		     :name name
-		     :type type
-		     :directory `(,@(pathname-directory
-				     (user-homedir-pathname))
-				    ".allegrograph")))))
-    (cond ((and prefer-current-directory-p current-file)
-	   current-file)
-	  (t
-	   (or home-file current-file)))))
-
 
 #|
 (defcategory :error)
