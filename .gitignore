@@ -4,6 +4,7 @@ common-lisp.net
 .vcs
 GNUmakefile
 init-lisp.lisp
+project-init.lisp
 
 log5.tar.gz
 website/output/
