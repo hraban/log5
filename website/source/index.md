@@ -21,21 +21,23 @@ For more details, see the [overview][] or the [user-guide][].
 ### Getting Log5
 
 log5 is implemented and stabile.  
+                                  
+metabang.com is slowly switch from [darcs][] to [git][] for source control; the current log5 repository is on [github][github-log5] and you can clone it using:
 
-Metabang.com uses [darcs][] for source control; the log5 repository is at:
-
-    darcs get http://common-lisp.net/project/log5
+    git clone git://github.com/gwkkwg/log5
 
 You can use [ASDF-Installing][asdf-install] or just download a [tarball][]. It's also on the [CLiki][log5-cliki]. Common-Lisp.net hosts the project's mailing list:
 
 > [log5-devel@common-lisp.net][log5-mailing-list]
 
-You can also follow development on [unCLog][].
+You can also follow development (such as it is :-)) on [unCLog][].
 
 Share peace!
 
 
 ### Latest News 
+   
+15 February 2009 - how time flies. moved to git
 
 22 December 2007 - Some bug fixes and minor tweaks
 

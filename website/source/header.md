@@ -24,7 +24,9 @@
   [mailto-log5]: mailto:log5-devel@common-lisp.net
   [Arnesi]: http://common-lisp.net/project/bese/arnesi.html
 
-  
+ [log5-github]: http://github.com/gwkkwg/log5
+ [git]: http://git-scm.com/
+   
 <div id="header">
 {include navigation.md}
 </div>
