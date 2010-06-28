@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>currentDocument</key>
+	<string>source/index.md</string>
 	<key>documents</key>
 	<array>
 		<dict>
@@ -23,18 +25,28 @@
 		<dict>
 			<key>filename</key>
 			<string>source/header.md</string>
+			<key>lastUsed</key>
+			<date>2010-04-10T15:11:02Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>../../shared/shared-links.md</string>
+			<key>lastUsed</key>
+			<date>2010-04-10T15:10:59Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>source/index.md</string>
 			<key>lastUsed</key>
-			<date>2007-12-23T02:32:57Z</date>
+			<date>2010-04-10T15:11:02Z</date>
 			<key>selected</key>
 			<true/>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>source/navigation.md</string>
+			<key>lastUsed</key>
+			<date>2010-04-10T15:07:37Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -60,10 +72,90 @@
 	<key>fileHierarchyDrawerWidth</key>
 	<integer>223</integer>
 	<key>metaData</key>
-	<dict/>
+	<dict>
+		<key>../../shared/shared-links.md</key>
+		<dict>
+			<key>caret</key>
+			<dict>
+				<key>column</key>
+				<integer>17</integer>
+				<key>line</key>
+				<integer>68</integer>
+			</dict>
+			<key>firstVisibleColumn</key>
+			<integer>22</integer>
+			<key>firstVisibleLine</key>
+			<integer>40</integer>
+		</dict>
+		<key>source/header.md</key>
+		<dict>
+			<key>caret</key>
+			<dict>
+				<key>column</key>
+				<integer>0</integer>
+				<key>line</key>
+				<integer>20</integer>
+			</dict>
+			<key>firstVisibleColumn</key>
+			<integer>0</integer>
+			<key>firstVisibleLine</key>
+			<integer>0</integer>
+		</dict>
+		<key>source/index.md</key>
+		<dict>
+			<key>caret</key>
+			<dict>
+				<key>column</key>
+				<integer>0</integer>
+				<key>line</key>
+				<integer>27</integer>
+			</dict>
+			<key>columnSelection</key>
+			<false/>
+			<key>firstVisibleColumn</key>
+			<integer>0</integer>
+			<key>firstVisibleLine</key>
+			<integer>9</integer>
+			<key>selectFrom</key>
+			<dict>
+				<key>column</key>
+				<integer>0</integer>
+				<key>line</key>
+				<integer>24</integer>
+			</dict>
+			<key>selectTo</key>
+			<dict>
+				<key>column</key>
+				<integer>0</integer>
+				<key>line</key>
+				<integer>27</integer>
+			</dict>
+		</dict>
+		<key>source/navigation.md</key>
+		<dict>
+			<key>caret</key>
+			<dict>
+				<key>column</key>
+				<integer>0</integer>
+				<key>line</key>
+				<integer>0</integer>
+			</dict>
+			<key>firstVisibleColumn</key>
+			<integer>0</integer>
+			<key>firstVisibleLine</key>
+			<integer>0</integer>
+		</dict>
+	</dict>
+	<key>openDocuments</key>
+	<array>
+		<string>source/index.md</string>
+		<string>source/navigation.md</string>
+		<string>source/header.md</string>
+		<string>../../shared/shared-links.md</string>
+	</array>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{828, 0}, {578, 788}}</string>
+	<string>{{18, 0}, {578, 778}}</string>
 </dict>
 </plist>

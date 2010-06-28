@@ -22,11 +22,11 @@ For more details, see the [overview][] or the [user-guide][].
 
 log5 is implemented and stabile.  
                                   
-metabang.com is slowly switch from [darcs][] to [git][] for source control; the current log5 repository is on [github][github-log5] and you can clone it using:
+metabang.com is slowly switching from [darcs][] to [git][] for source control; the current log5 repository is on [github][github-log5] and you can clone it using:
 
     git clone git://github.com/gwkkwg/log5
 
-You can use [ASDF-Installing][asdf-install] or just download a [tarball][]. It's also on the [CLiki][log5-cliki]. Common-Lisp.net hosts the project's mailing list:
+You can use [ASDF-Install][asdf-install] or just download a [tarball][]. It's also on the [CLiki][log5-cliki]. Common-Lisp.net hosts the project's mailing list:
 
 > [log5-devel@common-lisp.net][log5-mailing-list]
 

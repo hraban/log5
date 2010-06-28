@@ -162,8 +162,8 @@ Nice to have undefcategory or the like
 	       (when (= (sbit (active-categories sender) id) 1)
 		 (funcall (handle-message-fn sender) 
 			  id sender (find-or-create-output sender)))))
-      (declare (dynamic-extent (function find-or-create-output 
-					 handle-message-for-sender)))
+      (declare (dynamic-extent (function find-or-create-output)
+			       (function handle-message-for-sender)))
       ;; maybe 'map-senders'
       (let ((*print-pretty* nil))
 	(dolist (sender (log5-senders manager))
