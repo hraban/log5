@@ -144,7 +144,7 @@ Nice to have undefcategory or the like
   (setf (log5-ignore-errors? (log-manager)) (not (null value))))
 
 (defmacro handle-message (id message &rest args)
-  `(%handle-message ,id ,message (lambda () '(,@args))))
+  `(%handle-message ,id ,message (lambda () (list ,@args))))
 
 (defun %handle-message (id message arg-thunk)
   (let* ((outputs nil)

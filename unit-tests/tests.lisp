@@ -33,10 +33,11 @@
 			 '("test" category message) 
 			 'stream-sender 
 			 :location string-stream))
-  (log-for warn "nothing")
+  (let ((there :there))
+    (log-for warn "nothing ~a to ~a" :here there))
   (ensure-same 
    (get-output-stream-string string-stream) 
-   (format nil "test ~a nothing~%" 'warn)))
+   (format nil "test ~a nothing here to there~%" 'warn)))
 
 (deftestsuite test-category-combinations (log5-test)
   ()
