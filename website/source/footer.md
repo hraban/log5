@@ -1,5 +1,5 @@
 <div id="footer">
-{include navigation.md}
+{include navigation.mmd}
 
 ### Copyright (c) 2007 - 2009 Gary Warren King (gwking@metabang.com) 
 

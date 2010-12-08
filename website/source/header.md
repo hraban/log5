@@ -20,5 +20,5 @@
   [mailto-log5]: mailto:log5-devel@common-lisp.net
    
 <div id="header">
-{include navigation.md}
+{include navigation.mmd}
 </div>
