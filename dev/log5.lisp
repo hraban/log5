@@ -480,7 +480,7 @@ set to nil."
    (name :reader name :initarg :name)
    (output-spec :initarg :output-spec :reader output-spec)
    (handle-message-fn :reader handle-message-fn)
-   (message-creator :reader message-creator :initargs 'basic-message-creator
+   (message-creator :reader message-creator :initarg basic-message-creator
 		    :writer %set-message-creator)
    (active-categories :reader active-categories
 		      :initform (make-category-array 0)))
